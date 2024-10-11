@@ -1,3 +1,4 @@
+#include <iomanip> 
 #include "DenMat.h"
 
 template <typename T> int sgn(T val) {
@@ -315,22 +316,69 @@ void singdenmat_k::read_dm_restart(){
 			oneminusdm[ik][i*nb + i] = c1 - dm[ik][i*nb + i];
 	}
 }
-void singdenmat_k::write_dm_tofile(double t){
+void singdenmat_k::write_dm_tofile(int currentStep, int occup_write_interval, double t, double t0, double tend, double **e){
 	MPI_Barrier(MPI_COMM_WORLD);
 	if (!ionode) return;
-	//FILE *fil = fopen("denmat.out", "a"); // will be too large after long time
+	FILE *fil = fopen("denmat.out", "a"); // will be too large after long time
 	FILE *filbin = fopen("restart/denmat_restart.bin", "wb");
 	FILE *filtime = fopen("restart/time_restart.dat", "w"); fprintf(filtime, "%14.7le", t);
+	
 	//fprintf(fil, "Writing density matrix at time %10.3e:\n", t);
+	// Writing density matrix at k_[E = E_cmin] at time t.
+	// Printing absolute values to save space.  
+	fprintf(fil, "%21.3f   ", t/fs);
+	for (int b = 0; b < nb * nb; b++)
+		fprintf(fil, "%11.6f ", dm[0][b].abs());
+	fprintf(fil, "\n");
+    printf("Current step: %d\n", currentStep);
+	if (currentStep == 1) {
+		std::ofstream filoccupt("occupations_t0.out");
+		filoccupt << "# nk = " << nk_glob << " nb = " << nb << " nstep = " << currentStep
+                   << " t = " << std::fixed << std::setprecision(6) << t
+                   << " tstep = " << std::fixed << std::setprecision(6) << dt
+                   << " tend = " << std::fixed << std::setprecision(6) << tend << "\n";
+		for (int ik = 0; ik < nk_glob; ik++)
+		{
+			for (int b = 0; b < nb; b++)
+				filoccupt << std::fixed << std::setprecision(6) 
+				   << std::setw(9) << std::right << e[ik][b]
+				   << std::setw(12) << std::right << dm[ik][b*(nb+1)].real()
+                   << std::endl;
+		}	
+		filoccupt.flush();
+		filoccupt.close();
+	}
+	if (occup_write_interval != 0 && currentStep % occup_write_interval == 0) 
+	{
+		int width = 5;
+		std::string paddedStep = std::to_string(currentStep);
+		paddedStep = std::string(width - paddedStep.length(), '0') + paddedStep;
+		std::string occupFilename = "occupations-" + paddedStep + ".out";
+		std::ofstream filoccupt(occupFilename);
+		filoccupt << "# nk = " << nk_glob << " nb = " << nb << " nstep = " << currentStep
+                   << " t = " << std::fixed << std::setprecision(6) << t
+                   << " tstep = " << std::fixed << std::setprecision(6) << dt
+                   << " tend = " << std::fixed << std::setprecision(6) << tend << "\n";
+		for (int ik = 0; ik < nk_glob; ik++)
+		{
+			for (int b = 0; b < nb; b++)
+				filoccupt << std::fixed << std::setprecision(6) 
+				   << std::setw(9) << std::right << e[ik][b]
+				   << std::setw(12) << std::right << dm[ik][b*(nb+1)].real()
+                   << std::endl;
+		}
+		filoccupt.flush();	
+		filoccupt.close();
+	}
+
 	for (int ik = 0; ik < nk_glob; ik++)//{
 		//for (int i = 0; i < nb*nb; i++)
 			//fprintf(fil, "(%15.7e,%15.7e) ", dm[ik][i].real(), dm[ik][i].imag());
 		fwrite(dm[ik], 2 * sizeof(double), nb*nb, filbin);
 		//fprintf(fil, "\n");
 	//}
-	//fflush(fil);
-	//fclose(fil); 
-	fclose(filbin); fclose(filtime);
+	fflush(fil); fflush(filbin); fflush(filtime);
+	fclose(fil); fclose(filbin); fclose(filtime);
 }
 void singdenmat_k::write_dm(){
 	MPI_Barrier(MPI_COMM_WORLD);

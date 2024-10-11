@@ -227,6 +227,19 @@ double minval(double **arr, int n1, int bStart, int bEnd){
 	return r;
 }
 
+int find_k_ecmin(double **arr, int n1, int bStart, int bEnd){
+	double r = DBL_MAX;
+	int k = -1;
+	for (int i1 = 0; i1 < n1; i1++)
+	for (int i2 = bStart; i2 < bEnd; i2++)
+		if (arr[i1][i2] < r)
+		{
+			r = arr[i1][i2];
+			k = i1;
+		}
+	return k;
+}
+
 void zeros(double* arr, int n1){
 	for (int i1 = 0; i1 < n1; i1++)
 		arr[i1] = 0.;

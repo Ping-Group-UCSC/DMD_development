@@ -131,9 +131,7 @@ void check_file_size(FILE *fp, size_t expect_size, string message){
 	}
 }
 bool check_file_size(FILE *fp, size_t expect_size){
-	size_t sz = file_size(fp);
-	if (sz != expect_size) return false;
-	else true;
+	return (file_size(fp) == expect_size);
 }
 
 void fseek_bigfile(FILE *fp, size_t count, size_t size, int origin){

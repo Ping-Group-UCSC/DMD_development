@@ -14,7 +14,7 @@ public:
 	int ns, nk, nb, nb_wannier, bskipped_wannier, bskipped_dft, nk_morek; // spin, k point, band
 	int nv, nc; // valence and conduction bands
 	int bStart_dm, bEnd_dm, nb_dm, nv_dm, nc_dm; // band range related to density matrix
-	int bStart_eph, bEnd_eph, nb_eph, nv_eph, nc_eph;
+	int bStart_eph, bEnd_eph, nb_eph, nv_eph, nc_eph, kecmin;
 	std::vector<vector3<>> kvec, kvec_morek;
 	bool print_along_kpath, print_layer_occ, print_layer_spin;
 	std::vector<vector3<double>> kpath_start, kpath_end;
@@ -93,8 +93,9 @@ public:
 		}
 		emax = maxval(e_dm, nk, nv_dm, nb_dm);
 		ecmin = minval(e_dm, nk, nv_dm, nb_dm);
+		kecmin = find_k_ecmin(e_dm, nk, nv_dm, nb_dm);
 		if (ionode) printf("\nElectronic states energy range:\n");
-		if (nb_dm > nv_dm && ionode) printf("emax = %lg ecmin = %lg\n", emax, ecmin);
+		if (nb_dm > nv_dm && ionode) printf("emax = %lg ecmin = %lg k_ecmin = %d \n", emax, ecmin,kecmin);
 		for (int iD = 0; iD < eip.ni.size(); iD++)
 			if (nb_dm > nv_dm && eip.partial_ionized[iD] && eip.Eimp[iD] > ecmin) error_message("Impurity level should not be higher than CBM", "electron constructor");
 		evmax = maxval(e_dm, nk, 0, nv_dm);

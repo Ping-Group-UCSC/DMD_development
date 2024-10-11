@@ -45,10 +45,31 @@ void parameters::get_valley_transitions(string file_forbid_vtrans){
 	}
 }
 
-void parameters::read_param(){
+void parameters::read_param(int argc, char** argv){
 	fstream fin;
-	fin.open("param.in", ios::in);
-	if (fin.fail()) error_message("input file param.in does not exist");
+	string inFile = "";
+	if (argc == 1)
+	{
+		inFile = "param.in";
+        	if(ionode)
+		{ 
+			printf("Input file not specified at runtime.\n");
+        		printf("Attempting to read simulation parameters from default input file: %s\n", inFile.c_str());
+		}
+        	fin.open(inFile, ios::in);
+        	if (fin.fail()) error_message("ERROR: input file param.in does not exist");
+	}
+	else if ( argc == 2 )
+	{
+        	inFile = argv[1];
+        	if (ionode) printf("Attempting to read simulation parameters from specified input file: %s\n", inFile.c_str());
+        	fin.open(inFile, ios::in);
+        	if (fin.fail()) error_message("ERROR: input file does not exist");
+	}
+	else if (argc > 2)
+	{
+        	error_message("ERROR: too many arguments for input file name.\n");
+	}
 	std::map<std::string, std::string> param_map = map_input(fin);
 
 	if (ionode) printf("\n");
@@ -119,12 +140,18 @@ void parameters::read_param(){
 	alg.sparseP = get(param_map, "alg_sparseP", 0);
 	alg.thr_sparseP = get(param_map, "alg_thr_sparseP", 1e-40);
 
-	if (ionode) printf("\nphenomenological relaxation parameters:\n");
+	if (ionode) printf("\nPhenomenological relaxation parameters:\n");
 	alg.phenom_relax = get(param_map, "alg_phenom_relax", 0);
 	if (alg.phenom_relax){
 		tau_phenom = get(param_map, "tau_phenom", 1e15, ps);
 		bStart_tau = get(param_map, "bStart_tau", 0); // relative to bStart_dm
 		bEnd_tau = get(param_map, "bEnd_tau", 0);
+	}
+
+	if (ionode) printf("\nPhenomenological recombination parameters:\n");
+	alg.phenom_recomb = get(param_map, "alg_phenom_recomb", 0);
+	if (alg.phenom_recomb){
+		tau_phenom_recomb = get(param_map, "tau_phenom_recomb", 1e15, ps);
 	}
 
 	if (ionode) printf("\nSmearing parameters:\n");
@@ -263,7 +290,13 @@ void parameters::read_param(){
 	if (pmp.laserA > 0){
 		string pumpPoltype = getString(param_map, "pumpPoltype", "NONE");
 		pmp.laserPoltype = getString(param_map, "laserPoltype", pumpPoltype);
-		pmp.laserPol = pmp.set_Pol(pmp.laserPoltype);
+		if (pmp.laserPoltype == "ExEy"){
+			double theta = get(param_map, "ExEyPolAngle", 0.0);
+			pmp.laserPol = pmp.set_Pol(theta);
+		}
+		else {
+			pmp.laserPol = pmp.set_Pol(pmp.laserPoltype);
+		}
 		if (ionode) { pmp.print(pmp.laserPol); }
 		while (true){
 			int iPol = int(pmp.probePol.size()) + 1;
@@ -312,12 +345,18 @@ void parameters::read_param(){
 	tend = get(param_map, "tend", 0., fs);
 	tstep = get(param_map, "tstep", 1., fs);
 	if (pmp.laserAlg == "lindblad" || pmp.laserAlg == "coherent"){
-		double tstep_pump = get(param_map, "tstep_pump", tstep / fs, fs);
+		double tstep_laser_default = 2*M_PI/(10*pumpE); // 1/10th  the time period of laser
+		double tstep_pump = get(param_map, "tstep_pump", tstep_laser_default / fs, fs);
 		tstep_laser = get(param_map, "tstep_laser", tstep_pump / fs, fs);
+		if (ionode) printf("time period of laser = %f\n",  2*M_PI/pumpE);
+		if(tstep_laser > 5*tstep_laser_default) 
+		{
+			error_message("ERROR: tstep_laser is too large", "read_param");
+		}
+		else if((tstep_laser > tstep_laser_default) && ionode) printf("\nWARNING: tstep_laser is large! Consider decreasing it.\n");
 	}
 	else
-		tstep_laser = tstep;
-
+		tstep_laser = tstep;	
 	if (ionode) printf("\nOther measurement parameters:\n");
 	print_tot_band = get(param_map, "print_tot_band", 0);
 	alg.set_scv_zero = get(param_map, "alg_set_scv_zero", 0);
@@ -326,6 +365,7 @@ void parameters::read_param(){
 	freq_compute_tau = get(param_map, "freq_compute_tau", freq_measure_ene);
 	de_measure = get(param_map, "de_measure", 5e-4, eV);
 	degauss_measure = get(param_map, "degauss_measure", 2e-3, eV);
+	occup_write_interval = get(param_map, "occup_write_interval", 0);
 
 	//valley positions
 	while (true){
@@ -362,8 +402,7 @@ void parameters::read_param(){
 	ode.hstart = get(param_map, "ode_hstart", 1e-3, fs);
 	ode.hmin = get(param_map, "ode_hmin", 0, fs);
 	ode.hmax = get(param_map, "ode_hmax", std::max(tstep, tstep_laser) / fs, fs);
-	double dtmp = pmp.laserAlg == "coherent" ? 1 : tstep_laser / fs;
-	ode.hmax_laser = get(param_map, "ode_hmax_laser", dtmp, fs);
+	ode.hmax_laser = get(param_map, "ode_hmax_laser", tstep_laser/fs, fs);
 	ode.epsabs = get(param_map, "ode_epsabs", 1e-8);
 
 	/*
@@ -579,8 +618,17 @@ string parameters::getString(std::map<std::string, std::string> map, string key,
 		if (ionode) printf("%s = %s\n", key.c_str(), defaultVal.c_str());
 		return defaultVal;
 	}
-	if (ionode) printf("%s = %s\n", key.c_str(), (iter->second).c_str());
-	return iter->second;
+	std::istringstream iss(iter->second);
+	double realValue;
+	if (iss >> realValue){
+		realValue = std::stod(iter->second);
+		if (ionode) printf("%s = %lg\n", key.c_str(), realValue);
+		return defaultVal;
+	}
+	else{
+		if (ionode) printf("%s = %s\n", key.c_str(), (iter->second).c_str());
+		return iter->second;
+	}
 }
 
 std::string parameters::trim(std::string s){

@@ -28,6 +28,7 @@ void electronlight::evolve_laser_coh(double t, complex** dm, complex** dm1, comp
 	//double trel = t - pmp.pump_tcenter;
 	//complex prefac = cmi * pmp.laserA * exp( - std::pow(trel / pmp.pumpTau, 2) / 2) / sqrt(sqrt(M_PI)*pmp.pumpTau);
 	complex prefac = cmi * pmp.laserA;
+	complex Hmatel;
 	if (pmp.laserMode == "pump"){
 		double trel = t - pmp.pump_tcenter;
 		prefac = prefac * exp(-std::pow(trel / pmp.pumpTau, 2) / 2) / sqrt(sqrt(M_PI)*pmp.pumpTau);
@@ -37,6 +38,13 @@ void electronlight::evolve_laser_coh(double t, complex** dm, complex** dm1, comp
 	for (int ik_local = 0; ik_local < nk_proc; ik_local++){
 		int ik_glob = ik_local + ik0_glob;
 		compute_laserPt_coh(t, laserP[ik_local], e_dm[ik_glob]);
+        
+		// print matrix element of pump or constant light Hamiltonian for testing debugging
+		// if (ionode && (ik_local == 0))
+		// {
+		//	Hmatel = prefac * laserPt[0];
+		//	printf("light_v_time: %f %12.10f %12.10f\n", t/41.341374575751, Hmatel.real(), Hmatel.imag());
+		//  }
 
 		// H * dm - dm * H
 		//zhemm_interface(ddmdt_laser[ik_glob], false, laserPt, dm[ik_glob], nb_dm);

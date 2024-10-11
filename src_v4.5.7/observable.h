@@ -52,7 +52,7 @@ public:
 
 		prefac_per_cell_size = prefac_per_cell / latt->cell_size; //density in a.u.
 		prefac_per_cell_size_cmd = prefac_per_cell / latt->cell_size_cmd; //density in cm^{-d}
-		prefac_cmby_per_cell_size_cmd = prefac_per_cell_size_cmd / cmbys; //current density in cm^{-d} * cm/s
+		prefac_cmby_per_cell_size_cmd = prefac_per_cell_size_cmd / cmbys / Coul; //current density in Coul * cm^{-d} * cm/s
 
 		if (nb > nv){
 			gauss_elec = new GaussianSmapling(elec->ecmin, param->de_measure, elec->emax, param->degauss_measure);
@@ -174,7 +174,7 @@ void ob_1dmk<Tl, Te>::measure_brange(string what, bool diff, bool print_ene, dou
 				filtot = fopen(fname.c_str(), "a");
 				if (in_obSet(obSet1s, what)) fprintf(filtot, "#time(au), s(t), s(t) without exp(iwt)\n");
 				else if (in_obSet(obSet1l, what)) fprintf(filtot, "#time(au), l(t), l(t) without exp(iwt)\n");
-				else if (in_obSet(obSet1j, what)) fprintf(filtot, "#time(au), j(t), j(t) without exp(iwt)\n");
+				else if (in_obSet(obSet1j, what)) fprintf(filtot, "#time(au), j(t), j_d(t), j_od(t) in A/cm^2\n");
 				else if (what == "s-t2-wu" || what == "s-t2star") fprintf(filtot, "#time(au), s-t2(t)\n");
 				else if (in_obSet(obSet4, what)) fprintf(filtot, "#time(au), sqrt(entropy)(t)\n");
 				else if (what == "s-t2-mani") fprintf(filtot, "#time(au), sqrt(spin part of entropy)(t)\n");
@@ -196,6 +196,7 @@ void ob_1dmk<Tl, Te>::measure_brange(string what, bool diff, bool print_ene, dou
 	// initialization
 	double prefac = in_obSet(obSet1j, what) ? prefac_cmby_per_cell_size_cmd : prefac_per_cell_size_cmd;
 	double tot = 0, tot_amp = 0, dottot = 0, dottot_amp = 0, tot_tplusdt = 0, dottot_term2 = 0;
+	double tot_d = 0, tot_od = 0;
 	vector3<double> tot_t2star(0, 0, 0);
 	double entropy = 0, entropy_eq = 0;
 	zeros(obk, nk_glob); zeros(tot_band, nb);
@@ -278,6 +279,7 @@ void ob_1dmk<Tl, Te>::measure_brange(string what, bool diff, bool print_ene, dou
 		else{
 			for (int i = bStart; i < bEnd; i++){
 				double ob = 0, ob_amp = 0, dot_ = 0, dot_amp = 0, ob_tplusdt = 0, dot_term2 = 0;
+				double j_d = 0, j_od = 0;
 				vector3<double> ob_t2(0, 0, 0);
 				if (what == "dos")
 					ob = 1;
@@ -314,6 +316,8 @@ void ob_1dmk<Tl, Te>::measure_brange(string what, bool diff, bool print_ene, dou
 						if (diff){
 							ob += real(ob_kib_t * dm_kbi);
 							ob_amp += real(ob_kib * dm_kbi);
+							if (i == b) j_d += real(ob_kib_t * dm_kbi);
+							if (i != b) j_od += real(ob_kib_t * dm_kbi);
 						}
 						else if (i == b) ob += real(ob_kib * f[ik_glob][i]);
 						if (ddmdt){
@@ -332,6 +336,7 @@ void ob_1dmk<Tl, Te>::measure_brange(string what, bool diff, bool print_ene, dou
 				}
 				obk[ik_glob] += ob; tot_band[i - bStart] += ob;
 				tot += ob; tot_amp += ob_amp; tot_tplusdt += ob_tplusdt;
+				tot_d += j_d; tot_od += j_od;
 				if (iv >= 0) { tot_valley[iv] += ob; tot_valley_band[iv][i - bStart] += ob; }
 				dottot += dot_; dottot_amp += dot_amp; dottot_term2 += dot_term2;
 
@@ -355,6 +360,7 @@ void ob_1dmk<Tl, Te>::measure_brange(string what, bool diff, bool print_ene, dou
 		tot = prefac * tot;
 	else{
 		tot *= prefac; tot_amp *= prefac; tot_tplusdt *= prefac;
+		tot_d *= prefac; tot_od *= prefac;
 		for (int i = 0; i < bEnd - bStart; i++)
 			tot_band[i - bStart] *= prefac;
 		for (int iv = 0; iv < this->latt->vpos.size(); iv++){
@@ -380,7 +386,8 @@ void ob_1dmk<Tl, Te>::measure_brange(string what, bool diff, bool print_ene, dou
 						for (int i = 0; i < bEnd - bStart; i++)
 						if (what == "fn") fprintf(filtot, " %21.14le", tot_valley_band[iv][i]);
 					}
-					if (what != "fn") fprintf(filtot, " %21.14le", tot_amp);
+					if (what != "fn" && !in_obSet(obSet1j, what) ) fprintf(filtot, " %21.14le", tot_amp);
+					if (in_obSet(obSet1j, what)) fprintf(filtot, " %21.14le %21.14le", tot_d, tot_od);
 				}
 				fprintf(filtot, "\n");
 			}

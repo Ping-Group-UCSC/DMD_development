@@ -8,6 +8,7 @@
 #include "ElecLight.h"
 #include "ElectronPhonon.h"
 #include "phenomenon_relax.h"
+#include "phenomenon_recomb.h"
 #include "DenMat.h"
 #include "observable.h"
 #include "material_model.h"
@@ -24,6 +25,7 @@ public:
 	Telight* elight;
 	Teph* eph;
 	phenom_relax* phnm_rlx;
+	phenom_recomb* phnm_recomb;
 	singdenmat_k* sdmk;
 	ob_1dmk<Tl, Te>* ob;
 	double *tau_neq;
@@ -65,6 +67,7 @@ public:
 
 		// phenomenon 
 		if (alg.phenom_relax) phnm_rlx = new phenom_relax(param, elec->nk, elec->nb_dm, sdmk->dm_eq);
+		if (alg.phenom_recomb) phnm_recomb = new phenom_recomb(param, elec->nk, elec->nb_dm, elec->nv_dm);
 
 		// observables
 		ob = new ob_1dmk<Tl, Te>(latt, param, elec, eph->bStart, eph->bEnd);
@@ -274,6 +277,11 @@ public:
 			sdmk->update_ddmdt(sdmk->ddmdt_term);
 		}
 
+		if(alg.phenom_recomb){
+			phnm_recomb->evolve(sdmk->dm, elec->f_dm, sdmk->ddmdt_term);
+			sdmk->update_ddmdt(sdmk->ddmdt_term);
+		}
+
 		if (alg.semiclassical) zeros_off_diag(sdmk->ddmdt, sdmk->nk_glob, sdmk->nb);
 	}
 
@@ -321,7 +329,7 @@ public:
 
 	void report(int it, bool diff = true, bool prtprobe = true, bool prtdos = false, string lable = ""){
 		if (it % ob->freq_measure != 0) return;
-		if (it > 0) sdmk->write_dm_tofile(sdmk->t);
+		if (it > 0) sdmk->write_dm_tofile(it,param->occup_write_interval, sdmk->t, sdmk->t0, sdmk->tend,elec->e_dm);
 		bool print_ene = it % ob->freq_measure_ene == 0;
 		if (prtdos) ob->measure("dos", lable, true, true, sdmk->t, sdmk->dm); // for dos, diff == true just means file name has no "initial"
 		ob->measure("fn", lable, diff, print_ene, sdmk->t, sdmk->dm);

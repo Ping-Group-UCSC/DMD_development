@@ -26,8 +26,15 @@ public:
 			return normalize(complex(1, 0)*vector3<>(1, 0, 0));
 		else if (s == "Ey")
 			return normalize(complex(1, 0)*vector3<>(0, 1, 0));
-		else
-			error_message("laserPoltype must be LC, RC, Ex or Ey");
+		else{
+			error_message("ERROR: laserPoltype must be a string LC, RC, Ex, Ey, or ExEy \n");
+			return vector3<complex>(0, 0, 0);
+		}
+	}
+
+	vector3<complex> set_Pol (double theta){
+		theta = theta * M_PI / 180.0;
+		return normalize(complex(1, 0)*vector3<>(cos(theta), sin(theta), 0));
 	}
 
 	inline void print(const vector3<complex>& v, const char* format = "%lg "){

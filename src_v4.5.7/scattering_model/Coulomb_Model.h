@@ -641,8 +641,10 @@ struct coulomb_model
 			//if (ionode) printf("q = %lg  w = %lg in T\n", sqrt(q_length_square), w/T);
 			complex eps = heg->eps_intp(q, w);
 			//if (ionode) printf("|eps| = %lg\n", abs(eps));
-			if (abs(eps) == 0)
+			if (abs(eps) == 0){
 				error_message("eps is zero!","vq");
+				return c0;
+			}
 			else{
 				if (abs(eps) < 1e-20) printf("|eps| = %10.3le is too tiny!\n", abs(eps));
 				return complex(prefac_vq,0) / eps / q_length_square;
@@ -830,7 +832,7 @@ struct coulomb_model
 			double wp2 = clp.eppa * clp.eppa;
 
 			/*
-			//If we use qscr^2(w) = A / (w^2 - wq^2), we can include q=0 in Godby¨CNeeds PPA
+			//If we use qscr^2(w) = A / (w^2 - wq^2), we can include q=0 in Godbyï¿½CNeeds PPA
 			Aq_ppa.resize(qvec.size()); Eq2_ppa.resize(qvec.size());
 
 			for (size_t iq = 0; iq < qvec.size(); iq++){
@@ -845,7 +847,7 @@ struct coulomb_model
 			Eq2_ppa[iq] = dtmp / qscr2_RPA[iq][0];
 			}
 			else if (clp.ppamodel == "gn"){
-			//Godby¨CNeeds
+			//Godbyï¿½CNeeds
 			complex ctmp = wp2 * qscr2_RPA[iq][1];
 			Aq_ppa[iq] = -ctmp * qscr2_RPA[iq][0];
 			Eq2_ppa[iq] = ctmp / (qscr2_RPA[iq][0] - qscr2_RPA[iq][1]);
@@ -866,7 +868,7 @@ struct coulomb_model
 					Eq2_ppa[iq] = wp2 * (1 + complex(q_length_square, 0) / qscr2_RPA[iq][0]);
 				}
 				else if (clp.ppamodel == "gn"){
-					//Godby¨CNeeds
+					//Godbyï¿½CNeeds
 					complex eps0inv = c1 / (1 + qscr2_RPA[iq][0] / q_length_square);
 					complex epspinv = c1 / (1 + qscr2_RPA[iq][1] / q_length_square);
 					Eq2_ppa[iq] = wp2 * (1 - epspinv) / (epspinv - eps0inv);

@@ -66,6 +66,7 @@ double maxval(double *arr, int n1);
 double maxval(double **arr, int n1, int bStart, int bEnd);
 double minval(double *arr, int n1);
 double minval(double **arr, int n1, int bStart, int bEnd);
+int find_k_ecmin(double **arr, int n1, int bStart, int bEnd);
 
 double dot(double *v1, double *v2, int n);
 void axbyc(double *y, double *x, size_t n, double a = 1, double b = 0, double c = 0); // y = ax + by + c, default = copy

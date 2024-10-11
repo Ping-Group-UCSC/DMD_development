@@ -84,7 +84,7 @@ public:
 
 	void write_ddmdt(std::vector<vector3<double>> kvec, std::vector<int> ik_kpath, double **e);
 	void write_dm();
-	void write_dm_tofile(double t);
+	void write_dm_tofile(int it, int occup_write, double t, double t0, double tend, double **e);
 
 	// coherent dynamics
 	complex **Hcoh, *Hcoht;

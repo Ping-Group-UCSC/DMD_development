@@ -12,7 +12,7 @@ struct coulombParam{
 	string scrMode; // "none", "medium"
 	string scrFormula; // "debye", "lindhard", "heg" (homogeneous electron gas), "RPA"
 	string dynamic; // "static", "ppa", "real-axis" (real-energy axis with smearing)
-	string ppamodel; // "gn" (Godby¨CNeeds), "hl" (Hybertsen-Louie)
+	string ppamodel; // "gn" (Godbyï¿½CNeeds), "hl" (Hybertsen-Louie)
 	bool update, ovlp, fderavitive_technique, dynamic_screening_ee_two_freqs; // if ovlp, there is (n,n') sum with overlap, otherwise, (n) sum
 	double eppa, meff; // user-defined plasmon-pole energy, if zero, plasma frequency
 	int nomega; double omegamax; // real-energy axis, not implemented
@@ -64,6 +64,10 @@ struct elecimpParam{
 		if (ni.size() == 0 || (carrier_bvk_gs > 0 && isHole) || (carrier_bvk_gs < 0 && !isHole)) return n_bvk_ex;
 		else if (carrier_bvk_gs < 0 && isHole) return carrier_bvk_gs + (n_bvk_ex - nh_bvk_gs);
 		else if (carrier_bvk_gs > 0 && !isHole) return carrier_bvk_gs + (n_bvk_ex - ne_bvk_gs);
+		else{
+			error_message("Error: carrier_bvk_gs = 0 is not allowed", "elecimpParam");
+			return 0.0;
+		}
 	}
 	
 	void calc_ni_ionized(double t, double mu, bool silent = true){

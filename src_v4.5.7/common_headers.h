@@ -43,6 +43,7 @@ public:
 	bool expt, expt_elight, ddmdteq, summode, eph_sepr_eh, eph_need_elec, eph_need_hole, sparseP, Pin_is_sparse, set_scv_zero, semiclassical;
 	bool modelH0hasBS, read_Bso, scatt_enable, eph_enable, phenom_relax, only_eimp, only_ee, only_intravalley, only_intervalley, linearize, linearize_dPee;
 	bool use_dmDP_taufm_as_init, DP_beyond_carrierlifetime, positive_tauneq, use_dmDP_in_evolution;
+	bool phenom_recomb;
 	double thr_sparseP, mix_tauneq;
 
 	algorithm(){
@@ -64,6 +65,7 @@ public:
 		only_intravalley = false;
 		only_intervalley = false;
 		phenom_relax = false;
+		phenom_recomb = false;
 		ode_method = "rkf45";
 		Pin_is_sparse = false;
 		sparseP = false;

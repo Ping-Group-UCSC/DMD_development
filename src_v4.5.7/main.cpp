@@ -23,7 +23,7 @@ int main(int argc, char **argv)
 
 	// read parameters
 	parameters* param = new parameters();
-	param->read_param();
+	param->read_param(argc, argv);
 
 	init_model(param);
 	if (material_model == "none") dm_dynamics_jdftx(param);

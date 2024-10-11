@@ -27,6 +27,7 @@ public:
 		}
 		else{
 			error_message("this mode is not allowed");
+			return 0.0;
 		}
 	}
 };
