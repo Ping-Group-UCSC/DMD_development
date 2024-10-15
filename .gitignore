@@ -1,3 +1,5 @@
 /Makefile
 /make.inc
 /make.sh
+bin/
+obj/
