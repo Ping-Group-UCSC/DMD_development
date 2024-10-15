@@ -47,7 +47,7 @@ to install on CHTC, follow these steps-
 1. cp MAKE_FILES/make-CHTC.inc make.inc
 2. cp MAKE_FILES/make-CHTC.sh make.sh
 3. cp MAKE_FILES/Makefile-CHTC Makefile
-4. srun -n 1 -p int --pty bash 
+4. srun -n 4 -p int --pty bash 
 5. ./make.sh 
 
 
