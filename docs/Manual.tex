@@ -1,0 +1,194 @@
+\documentclass{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath} 
+\usepackage{amssymb} 
+\usepackage{amsthm}
+\usepackage{bm} % allows use of bold greek letters in math mode using the \bm{...} command
+\usepackage{empheq}
+\usepackage{float} % improves the interface for defining floating objects such as figures and tables
+\usepackage[textwidth=15cm]{geometry} % for easy management of document margins and the document page size
+\usepackage{mathtools} % supplements amsmath, some additional functionality, some bugs fixed
+\usepackage{mhchem} % allows you to easily type chemical species and equations
+\usepackage[numbers]{natbib} % gives additional citation options and styles, often used for journal submission
+\usepackage{physics}
+\usepackage{siunitx} % helps type SI units correctly
+\usepackage{tensor}
+\usepackage{textcomp} % provides extra symbols, e.g. arrows like \textrightarrow
+\usepackage[hyphens]{url}
+\usepackage{xcolor}
+\usepackage{xr-hyper}
+\usepackage{comment}
+\usepackage{booktabs,xltabular}
+\usepackage[final]{pdfpages} % allow to insert PDF
+
+\usepackage{hyperref} % gives LaTeX the possibility to manage links within the document or to any URL
+\hypersetup{
+	colorlinks=true,
+	urlcolor=blue,
+	linkcolor=blue
+}
+\usepackage{graphicx} % allows you to insert graphic files within a document
+\usepackage{subcaption} % allows to define multiple loats (figures, tables) within one environment giving idividual captions and labels in the form 1a, 1b
+\usepackage{listings}
+
+\lstdefinestyle{mystyle}{
+	showtabs=false,                  
+	tabsize=2
+}
+
+
+
+
+
+\lstset{style=mystyle}
+\newcommand\aug{\fboxsep=-\fboxrule\!\!\!\fbox{\strut}\!\!\!}
+
+\title{Density Matrix Dynamics \\
+User Manual}
+\author{Junqing Xu, Kejun Li, Yuan Ping}
+\date{\today}
+
+\begin{document}
+	
+	\maketitle
+	\pagebreak
+	\tableofcontents
+	
+	\pagebreak
+	
+\section{Introduction}
+DMD is a first-principles real time density matrix dynamics code. It uses wannierized ground state electronic structure calculated at the density funcional theory (DFT) level along with various scattering interactions and coherent contributions. Currently, DMD only interfaces with JDFTx, a general purpose DFT code and relies on an intermediate brigding code, FeynWann, for inialization and intermemdiate calculations of the scattering processes. 
+
+\section{Installation}
+
+Create build directory at the same level as \verb|src| directory in the main DMD directory. Change  \verb|make.inc| to point to dependencies according to your specific system ennvironment.
+\begin{enumerate}
+\item Make sure intel mpi compiler and command \verb|mpiicpc| or its equivalent exist.
+\item  GSL and MKL must be installed and ensure \verb|MKLROOT|  points to correct location.
+\item Modify \verb|GRL_DIR| in \verb|make.inc| and \verb|SRC_DIRS| in \verb|Makefile|, if necessary.
+\item If there is no "build" directory, make it.
+\item Issue \verb|make| command in the main directory. 
+\end{enumerate}
+
+	
+\section{DMD Input}%%%%%%%%
+DMD parses input commands from a simple text file with one command per line, first entry is the command key and the second is command value, if any. 
+\subsection{DMD Commands}
+	\begin{xltabular}{\textwidth}{X X X}
+		\caption{Parameters in DMD input param.in for task control and algorithms.}\\
+		\toprule\toprule
+		parameter & input & meaning \\
+		\midrule
+		
+		restart & 1 (default) or 0 & If 1, start from scratch; else if 0, restart.\\
+		\midrule
+		
+		alg\_scatt & lindblad (default) or conventional & It determines the form of the scattering term of the master equation.\\
+		\midrule
+		
+		alg\_eph\_sepr\_eh, alg\_eph\_need\_elec, alg\_eph\_need\_hole & 1 or 0 & If alg\_eph\_sepr\_eh = 0, electron and hole will be calculated together. If alg\_eph\_sepr\_eh = 1, electron and hole will be calculated separately. Then, if ``ePhOnlyElec 1'' is in lindbladInit.in, set  alg\_eph\_need\_elec = 1 and alg\_eph\_need\_hole = 0. If ``ePhOnlyHole 1'' is in lindbladInit.in, set  alg\_eph\_need\_elec = 0 and alg\_eph\_need\_hole = 1.\\
+		\midrule
+		
+		alg\_sparseP & 1 or 0 (default) & If 1, the code will convert the generalized scattering-rate matrix P to a sparse matrix. If 0, matrix P is kept dense. Search for ``ns\_tot'' in output to see how many elements of $\mathrm{P}_i$ matrices are larger than several thresholds (default 1e-40) generally, larger energy range and smaller smearing make $\mathrm{P}_i$ more sparse.\\
+		\midrule
+		
+		alg\_phenom\_relax & 1 or 0 (default) & If 1, phenomenon relaxation $\dot{\rho} = -(\rho - \rho_\text{eq}) / \tau_\text{phenom}$ will be turned on. If 0, it will be turned off.\\
+		\midrule
+
+		alg\_phenom\_recomb & bool (default 0) & If 1, phenomenonlogical recombination to represent spontaneous emission will be turned on.\\
+		
+		tau\_phenom\_recomb & float (default $10^{15}$ ps) & Phenomenonlogical recombination time in pico seconds.\\
+		\midrule
+		
+		Bxpert, Bypert, Bzpert & a number, e.g. 0.0 (default) & Magnetic field perturbation, one of the mothods that perturbs a system to generate spin unbalance, in the unit of Tesla. x, y and z are cartesian coordinates consistent to input cell parameters.\\
+		\midrule
+		
+		pumpMode & coherent or lindblad or perturb & Perturbation by pumping, the other method that is used to perturb a system to generate spin unbalance. The pump pulse is Gaussian. coherent : real-time pump using coherent formula $-i[\mathrm{P}(t),\rho]$. lindblad : real-time pump using lindblad formula. perturb : generate an initial pump perturbation.\\
+		\midrule
+		
+		pumpA0 & a number, e.g. 0.0 & Pump amplitude, pump power = (pumpE * pumpA0)$^2$ / ($8\pi \alpha$)\\
+		\midrule
+		
+		pumpPoltype & LC or RC or Ex or Ey & Pump polarization type.\\
+		\midrule
+		
+		pumpE & a number, e.g. 0.1 & Pump energy in eV.\\
+		\midrule
+		
+		pumpTau & a number, e.g. 50 & Pump pulse width in the unit of fs. This introduces a weight function $\mathrm{exp}(-t^2/2\tau^2) / \sqrt{\sqrt{\pi} * \tau}$ into pump amplitude\\
+		\midrule
+		
+		probePoltype1 & LC or RC or Ex or Ey & The first probe polarization type.\\
+		\midrule
+		
+		probePoltype$i$ & LC or RC or Ex or Ey & The $i$-th probe polarization type.\\
+		\midrule
+		
+		probeEmin, probeEmax & a number & These parameters specify the probe energy range in the unit of eV.\\
+		\midrule
+		
+		probeDE & a number, e.g. 0.01 & Probe energy step in the unit of eV.\\
+		\midrule
+		
+		probeTau & a number, e.g. 2000 & Probe pulse width in unit the unit of fs.\\
+		\midrule\midrule
+		
+		t0 & a number, e.g. 0 (default) & The initial time of spin dynamics in the unit of fs.\\
+		\midrule
+		
+		tend & a number, e.g. 1e6 & The end time of spin dynamics for reporting in the unit of fs. This number needs to be larger at lower temperature because spin dynamics is slower at lower temperature. 1e6 is used for T=4K.\\
+		\midrule
+		
+		tstep & a number, e.g. 1e3 & Time step in the unit of fs.\\
+		\midrule
+		
+		tstep\_pump & a float & Time step for reporting during pump (pump time center $\pm$6*pumpTau), in the unit of fs.\\
+		\midrule
+		
+		freq\_measure\_ene & a integer & This parameter specifies how often to print energy-resolved observables.\\
+		\midrule
+		
+		temperature & a number, e.g. 300 & Temperature at which calculation is done. Currently, it is actually directly read from the output of the initialization calculation, so that it is not necessary to set temperature.\\
+		\midrule
+		
+		mu & a number, e.g. 0.5 & Chemical potential in the unit of eV, usually relative to VBM, must be in range [dmuMin, dmuMax] in initialization\\
+		\midrule
+		
+		carrier\_density & a number, e.g. 1e18 & Carrier density in the unit of cm$^{-d}$, where d (3,2,1,0) is the dimension of the material. Positive means electron density and negative means hole density. It can be referred to and smaller than the carrier density in the lindblad initialization output lindbladInit.out. When this parameter is used, mu is ignored.\\
+		\midrule
+		
+		tau\_phenom & float & Phenomenon relaxation time in the unit of ps.\\
+		\midrule
+		
+		scrMode & medium or none (default) & "none" means no screening will be computed. "medium" means the dielectric function = interband dielectric constant * intraband dielectric function. interband one must be provided by epsilon\_background. intraband one will be computed by the program.\\
+		\midrule
+		
+		epsilon\_background & a number, e.g. 30 & static dielectric constant $\varepsilon_0$.\\
+		\midrule
+		
+		eeMode & Pee\_update or Pee\_fixed\_at\_eq & The electron-electron scattering matrix P depends on the density matrix $\rho$. There are options of updating the scattering matrix $\mathrm{P^{e-e}}$ (Pee\_update) and fixing the matrix (Pee\_fixed\_at\_eq) during spin dynamics.\\
+		\midrule
+		
+		freq\_update\_ee\_model & integer & This parameter controls how often $\mathrm{P^{e-e}}$ is updating duing spin dynamics. If $<=$ 0, $\mathrm{P^{e-e}}$ is updated every step. \\
+		\midrule
+		
+		alg\_eph\_enable & 1 (default) or 0 & If 1, enable the electron-phonon scattering. If 0, diable electron-phonon scattering.\\
+		\midrule
+		
+		alg\_only\_eimp & 1 or 0 (default) & If 1, only consider the electron-impurity scattering. If 0, consider the scattering processes other than electron-impurity.\\
+		\midrule
+		
+		impMode & ab\_neutral or model\_ionized & Currently, the electron-impurity scattering by neutral defects is computed by supercell method at DFT, and that by charge defects is computed by a charge defect model. If ab\_neutral, electron-impurity scattering considers short-range interaction due to neutral defects. If model\_ionized, the scattering considers long-range interaction due to charge defects.\\
+		\midrule
+		
+		impurity\_density & a number, e.g. 1e18 & Impurity density in the unit of cm$^{-d}$, where d (3,2,1,0) is the dimension of the material.\\
+		\midrule
+		
+		\bottomrule\bottomrule
+		\label{tab:dmd}
+	\end{xltabular}
+	
+	
+
+\end{document}
