@@ -1,0 +1,16 @@
+/**
+ * \page manual_page Manual
+ * Here is the original PDF manual.
+ * 
+ * \section pdf_section PDF Documentation
+ * For detailed information, see the following document:
+ * \htmlonly
+ * <iframe src="Manual.pdf" width="100%" height="500px">
+ *   <p>Your browser does not support iframes.</p>
+ * </iframe>
+ * <br>
+ * <a href="Manual.pdf" download="Manual.pdf">
+ *   <button>Download PDF</button>
+ * </a>
+ * \endhtmlonly
+ */
