@@ -1,11 +1,10 @@
 cmake_minimum_required(VERSION 3.10)
 project(denmat_dynm_v4.5.7 CXX)
 
-# Set the C++ standard
+# --- C++ Standard and Build Type ---
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Optionally set build type if not specified externally
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
@@ -14,12 +13,11 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Intel")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -traceback")
 endif()
 
-# --- Compiler Flags ---
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -g")
 message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 
 # --- GSL Setup ---
-set(GSL_INCLUDE_DIR "/usr/include/gsl")
+set(GSL_INCLUDE_DIR "/opt/homebrew/Cellar/gsl/2.8")
 if(EXISTS "${GSL_INCLUDE_DIR}")
     message(STATUS "Found GSL include directory: ${GSL_INCLUDE_DIR}")
 else()
@@ -55,24 +53,43 @@ if(USE_MKL AND DEFINED ENV{MKLROOT})
     message(STATUS "MKL library directory: ${MKL_LIB_DIR}")
     link_directories(${MKL_LIB_DIR})
 
-    # Define core MKL linker flags (for the LP64 interface using sequential threading).
+    # Define MKL libraries.
     set(MKL_LIBS "-lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl")
-
-    # --- MKL Scalapack and BLACS Setup (for MPI) ---
-    # Adjust these if you are using a different MPI implementation or integer interface.
     set(MKL_SCALAPACK_LIB "mkl_scalapack_lp64")
     set(MKL_BLACS_LIB "mkl_blacs_openmpi_lp64")
 else()
-    message(STATUS "MKL not used or MKLROOT not defined. Falling back to system Scalapack.")
+    message(STATUS "MKL not used or MKLROOT not defined. Falling back to system ScaLAPACK.")
     set(USE_MKL OFF)
-    # --- System SCALAPACK Setup ---
-    # These paths are typical on Linux; adjust them for macOS (e.g., if installed via Homebrew).
-    set(SCALAPACK_INCLUDE_DIR "/usr/include")
-    set(SCALAPACK_LIB_DIR "/usr/lib/x86_64-linux-gnu")
-    message(STATUS "Assuming system SCALAPACK headers are in: ${SCALAPACK_INCLUDE_DIR}")
-    message(STATUS "Assuming system SCALAPACK libraries are in: ${SCALAPACK_LIB_DIR}")
-    # Uncomment the following line if needed:
-    # link_directories(${SCALAPACK_LIB_DIR})
+
+    # --- System ScaLAPACK Setup ---
+    # Set the expected ScaLAPACK include directory.
+    set(SCALAPACK_INCLUDE_DIR "/opt/homebrew/Cellar/scalapack/2.2.2/include")
+    message(STATUS "Assuming system ScaLAPACK headers are in: ${SCALAPACK_INCLUDE_DIR}")
+
+    # Locate the ScaLAPACK library.
+    find_library(SCALAPACK_LIB
+      NAMES scalapack libscalapack
+      HINTS /opt/homebrew/lib /usr/local/lib
+    )
+    if(NOT SCALAPACK_LIB)
+        message(FATAL_ERROR "ScaLAPACK library not found. Please install ScaLAPACK or set the correct path.")
+    else()
+        message(STATUS "Found ScaLAPACK library: ${SCALAPACK_LIB}")
+    endif()
+
+    # Add the directory where ScaLAPACK was found.
+    get_filename_component(SCALAPACK_LIB_DIR "${SCALAPACK_LIB}" DIRECTORY)
+    link_directories(${SCALAPACK_LIB_DIR})
+
+    # --- LAPACK Setup using OpenBLAS ---
+    # Append the OpenBLAS library path so that FindLAPACK can locate liblapack.dylib.
+    set(CMAKE_LIBRARY_PATH "${CMAKE_LIBRARY_PATH}:/opt/homebrew/Cellar/openblas/0.3.29/lib")
+    find_package(LAPACK REQUIRED)
+    if(LAPACK_FOUND)
+        message(STATUS "Found LAPACK libraries: ${LAPACK_LIBRARIES}")
+    else()
+        message(FATAL_ERROR "LAPACK not found!")
+    endif()
 endif()
 
 # --- Project Source Files ---
@@ -85,7 +102,7 @@ foreach(src ${SOURCES})
     message(STATUS "  ${src}")
 endforeach()
 
-# --- Include Directories for the Project ---
+# --- Project Include Directories ---
 set(PROJECT_INCLUDE_DIRS
     "${CMAKE_SOURCE_DIR}/src_v4.5.7"
     "${CMAKE_SOURCE_DIR}/src_v4.5.7/comm"
@@ -105,12 +122,11 @@ endforeach()
 # --- Create the Executable ---
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-# --- Target-Specific Include Directories ---
+# --- Target Include Directories ---
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${PROJECT_INCLUDE_DIRS}
     ${GSL_INCLUDE_DIR}
 )
-
 if(USE_MKL)
     target_include_directories(${PROJECT_NAME} PRIVATE ${MKL_INCLUDE_DIR})
 else()
@@ -139,7 +155,8 @@ if(USE_MKL)
 else()
     target_link_libraries(${PROJECT_NAME} PRIVATE
         gsl gslcblas
-        scalapack
+        ${SCALAPACK_LIB}
+        ${LAPACK_LIBRARIES}
         MPI::MPI_CXX
     )
 endif()
