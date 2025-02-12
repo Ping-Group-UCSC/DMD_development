@@ -18,7 +18,18 @@ message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 
 # --- GSL Setup ---
 # set(GSL_INCLUDE_DIR "/opt/homebrew/Cellar/gsl/2.8")   #macOS
-set(GSL_INCLUDE_DIR "/usr/include/gsl")                 #Linux
+#set(GSL_INCLUDE_DIR "/usr/include/gsl")                 #Linux
+# Use find_package to be able to use GSL_ROOT_DIR
+
+find_package(GSL REQUIRED)
+
+if(EXISTS "${GSL_ROOT_DIR}/lib")
+    set(GSL_LIB_DIR "${GSL_ROOT_DIR}/lib")
+link_directories(${GSL_LIB_DIR})
+else()
+    message(FATAL_ERROR "GSL library directory not found in ${GSL_ROOT_DIR}/lib")
+endif()
+
 if(EXISTS "${GSL_INCLUDE_DIR}")
     message(STATUS "Found GSL include directory: ${GSL_INCLUDE_DIR}")
 else()
@@ -28,9 +39,9 @@ endif()
 # --- Option to Use MKL ---
 option(USE_MKL "Use MKL for linear algebra operations" ON)
 
-if(USE_MKL AND DEFINED ENV{MKLROOT})
+if(USE_MKL AND DEFINED MKLROOT)
     # --- MKL Setup ---
-    set(MKLROOT $ENV{MKLROOT})
+    #set(MKLROOT $ENV{MKLROOT}) Use Cmake variable instead of environment
     message(STATUS "Using MKL from MKLROOT: ${MKLROOT}")
 
     # Locate the MKL include directory.
