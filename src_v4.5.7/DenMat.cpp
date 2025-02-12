@@ -119,15 +119,16 @@ void singdenmat_k::set_dm_eq(double temperature, double **e, int nv){
 	}
 
 	for (int ik = 0; ik < nk_glob; ik++)
-	for (int i = 0; i < nb; i++)
-		dm_eq[ik][i*nb + i] = f_eq[ik][i];
+	  for (int i = 0; i < nb; i++)
+	  	dm_eq[ik][i*nb + i] = f_eq[ik][i];
 }
 void singdenmat_k::set_dm_eq(bool isHole, double temperature, double mu0, double **e, int bStart, int bEnd){
 	double nfree_bvk = 0.;
 	for (int ik = 0; ik < nk_glob; ik++)
-	for (int i = bStart; i < bEnd; i++)
-	if (!isHole) nfree_bvk += real(dm[ik][i*nb + i]);
-	else nfree_bvk += (real(dm[ik][i*nb + i]) - 1.); // hole concentration is negative
+	  for (int i = bStart; i < bEnd; i++)
+	    if (!isHole) nfree_bvk += real(dm[ik][i*nb + i]);
+	    else nfree_bvk += (real(dm[ik][i*nb + i]) - 1.); // hole concentration is negative
+
 	if (elec->nk_morek){
 		for (int ik = 0; ik < nk_glob; ik++)
 		for (int i = bStart; i < bEnd; i++)

@@ -32,7 +32,7 @@ public:
 		: latt(latt), param(param), elec(elec), elight(elight), eph(eph)
 	{
 		// density matrix
-		sdmk = new singdenmat_k(param, &mpk, elec); // k-independent single density matrix
+		sdmk = new singdenmat_k(param, &mpk, elec); //<! k-independent single density matrix
 		//if (alg.use_dmDP_in_evolution) sdmk->init_dmDP(elec->ddm_Bpert, elec->ddm_Bpert_neq);
 		sdmk->init_Hcoh(elec->H_BS, elec->H_Ez, elec->e_dm);
 		// probe ground state
@@ -68,11 +68,11 @@ public:
 
 		// observables
 		ob = new ob_1dmk<Tl, Te>(latt, param, elec, eph->bStart, eph->bEnd);
-		report(0, false, false, true); // report initial quatities: dos, occupation, spin, probe to stdout
-		if (!param->restart) report(0); // write initial excess quantities in files
+		report(0, false, false, true); //!< report initial quatities: dos, occupation, spin, probe to stdout
+		if (!param->restart) report(0); //!< write initial excess quantities in files
 
 		// compute relaxtion according to intial density matrix
-		if (param->compute_tau_only){ compute(sdmk->t); report_tau(0); } //compute initial relaxation time
+		if (param->compute_tau_only){ compute(sdmk->t); report_tau(0); } // compute initial relaxation time
 		//if (!param->restart && param->compute_tau_only && alg.DP_beyond_carrierlifetime) compute_tauDP_beyond_carrierlifetime(); // compute DP relaxation time
 	}
 	/*
