@@ -17,7 +17,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -g")
 message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 
 # --- GSL Setup ---
-set(GSL_INCLUDE_DIR "/opt/homebrew/Cellar/gsl/2.8")
+# set(GSL_INCLUDE_DIR "/opt/homebrew/Cellar/gsl/2.8")   #macOS
+set(GSL_INCLUDE_DIR "/usr/include/gsl")                 #Linux
 if(EXISTS "${GSL_INCLUDE_DIR}")
     message(STATUS "Found GSL include directory: ${GSL_INCLUDE_DIR}")
 else()
