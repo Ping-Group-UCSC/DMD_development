@@ -19,14 +19,12 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -g")
 message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 
 # --- GSL Setup ---
-# For Ubuntu, headers are in /usr/include/gsl.
 set(GSL_INCLUDE_DIR "/usr/include/gsl")
 if(EXISTS "${GSL_INCLUDE_DIR}")
     message(STATUS "Found GSL include directory: ${GSL_INCLUDE_DIR}")
 else()
     message(FATAL_ERROR "GSL include directory not found: ${GSL_INCLUDE_DIR}")
 endif()
-# (GSL libraries are assumed to be in standard paths.)
 
 # --- MKL Setup ---
 # Ensure MKLROOT is defined.
@@ -61,21 +59,17 @@ link_directories(${MKL_LIB_DIR})
 set(MKL_LIBS "-lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl")
 
 # --- MKL Scalapack and BLACS Setup ---
-# If using MKL’s scalapack, you need to link both its scalapack interface and the BLACS library.
-# For the LP64 interface and using OpenMPI, use:
 set(MKL_SCALAPACK_LIB "mkl_scalapack_lp64")
 set(MKL_BLACS_LIB "mkl_blacs_openmpi_lp64")
-# (For Intel MPI use "mkl_blacs_intelmpi_lp64", and for ILP64 adjust accordingly.)
 
 # --- System SCALAPACK Setup ---
-# On Ubuntu the system scalapack headers are in /usr/include and libraries in /usr/lib/x86_64-linux-gnu.
 set(SCALAPACK_INCLUDE_DIR "/usr/include")
 set(SCALAPACK_LIB_DIR "/usr/lib/x86_64-linux-gnu")
 message(STATUS "Assuming system SCALAPACK headers are in: ${SCALAPACK_INCLUDE_DIR}")
 message(STATUS "Assuming system SCALAPACK libraries are in: ${SCALAPACK_LIB_DIR}")
-# (Uncomment if you need to force the system directory:
+
 # link_directories(${SCALAPACK_LIB_DIR})
-# )
+
 
 # --- Project Source Files ---
 file(GLOB_RECURSE SOURCES "${CMAKE_SOURCE_DIR}/src_v4.5.7/*.cpp")
@@ -89,8 +83,8 @@ endforeach()
 
 # --- Include Directories for the Project ---
 set(PROJECT_INCLUDE_DIRS
-    "${CMAKE_SOURCE_DIR}/src_v4.5.7"         # Top-level source directory
-    "${CMAKE_SOURCE_DIR}/src_v4.5.7/comm"     # Folder containing common headers
+    "${CMAKE_SOURCE_DIR}/src_v4.5.7"
+    "${CMAKE_SOURCE_DIR}/src_v4.5.7/comm"
     "${CMAKE_SOURCE_DIR}/src_v4.5.7/material_model"
     "${CMAKE_SOURCE_DIR}/src_v4.5.7/scattering_model"
     "${CMAKE_SOURCE_DIR}/src_v4.5.7/material_model/GaAs"
@@ -110,9 +104,9 @@ add_executable(${PROJECT_NAME} ${SOURCES})
 # --- Target-Specific Include Directories ---
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${PROJECT_INCLUDE_DIRS}
-    ${GSL_INCLUDE_DIR}        # For GSL
-    ${MKL_INCLUDE_DIR}        # For MKL
-    ${SCALAPACK_INCLUDE_DIR}  # For system SCALAPACK (if needed)
+    ${GSL_INCLUDE_DIR}
+    ${MKL_INCLUDE_DIR}
+    ${SCALAPACK_INCLUDE_DIR}
 )
 
 # --- MPI Setup ---
@@ -127,12 +121,12 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${MPI_CXX_INCLUDE_PATH})
 
 # --- Link Libraries ---
 target_link_libraries(${PROJECT_NAME} PRIVATE
-    gsl gslcblas            # GSL libraries
-    ${MKL_LIBS}             # Core MKL libraries
-    ${MKL_SCALAPACK_LIB}    # MKL’s Scalapack interface
-    ${MKL_BLACS_LIB}        # MKL’s BLACS library for MPI (OpenMPI assumed)
-    # scalapack               # System SCALAPACK library (if needed)
-    MPI::MPI_CXX            # MPI C++ library
+    gsl gslcblas
+    ${MKL_LIBS}
+    ${MKL_SCALAPACK_LIB}
+    ${MKL_BLACS_LIB}
+    # scalapack
+    MPI::MPI_CXX
 )
 
 # --- Set Output Directories ---
