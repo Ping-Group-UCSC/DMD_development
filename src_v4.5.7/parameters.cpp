@@ -293,6 +293,7 @@ void parameters::read_param(){
 	Bzpert = get(param_map, "Bzpert", 0., Tesla2au);
 	Bpert[0] = Bxpert; Bpert[1] = Bypert; Bpert[2] = Bzpert;
 	needL = get(param_map, "needL", 0);
+	pertL = get(param_map, "pertL", 0);
 
 	// time paramters and studying system parameters
 	if (ionode) printf("\nTime control parameters:\n");

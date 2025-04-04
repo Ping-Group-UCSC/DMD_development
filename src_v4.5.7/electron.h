@@ -27,6 +27,7 @@ public:
 	double gfac_mean, gfac_sigma, gfac_cap;
 	double *gfack; // mu_B * g of states
 	bool needL;
+	bool pertL;
 	complex ***s, **layer, **layerspin, ***v, **U, ***l;
 	std::vector<vector3<>> Bso;
 	complex **H_BS, **H_Ez;
@@ -46,7 +47,7 @@ public:
 		:temperature(param->temperature), mu(param->mu), carrier_density(param->carrier_density), carrier_density_means_excess_density(param->carrier_density_means_excess_density),
 		kmesh(vector3<int>(param->nk1, param->nk2, param->nk3)), nk_full((double)param->nk1*(double)param->nk2*(double)param->nk3), B(param->B),
 		print_along_kpath(param->print_along_kpath), kpath_start(param->kpath_start), kpath_end(param->kpath_end), nkpath(param->kpath_start.size()),
-		needL(param->needL), scissor(param->scissor),
+		needL(param->needL), pertL(param->pertL), scissor(param->scissor),
 		rotate_spin_axes(param->rotate_spin_axes), sdir_z(param->sdir_z), sdir_rot(param->sdir_rot),
 		v(nullptr){}
 	electron(mymp *mp, mymp *mp_morek, lattice *latt, parameters *param)
@@ -56,7 +57,7 @@ public:
 		H_BS(nullptr), H_Ez(nullptr), ddm_Bpert(nullptr), ddm_Bpert_neq(nullptr), dm_Bpert_neq(nullptr),
 		imsig_eph_kn(nullptr), imsig_eph_k(nullptr), imsig_eph_avg(0),
 		gfack(nullptr), gfac_normal_dist(param->gfac_normal_dist), gfac_k_resolved(param->gfac_k_resolved), gfac_mean(param->gfac_mean), gfac_sigma(param->gfac_sigma), gfac_cap(param->gfac_cap),
-		needL(param->needL), scissor(param->scissor),
+		needL(param->needL), pertL(param->pertL), scissor(param->scissor),
 		rotate_spin_axes(param->rotate_spin_axes), sdir_z(param->sdir_z), sdir_rot(param->sdir_rot),
 		v(nullptr)
 	{

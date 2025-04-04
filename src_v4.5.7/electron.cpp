@@ -62,6 +62,12 @@ void electron::set_H_Ez(int ik0_glob, int ik1_glob){ // seems not to work proper
 void electron::compute_dm_Bpert_1st(vector3<> Bpert, double t0){
 	if (ionode) printf("\ncompute magnectic-field-perturbed density matrix\n");
 	degthr = 1e-8;
+    if(pertL) printf("\nPertL\n");
+    else printf("\nNo PertL\n");
+    if(needL) printf("\nneedL\n");
+    else printf("\nNo needL\n");
+	if (needL && pertL) printf("\nUsing S and L for perturbed density matrix\n");
+    else printf("\nOnly using S for perturbed density matrix\n");
 
 	dm_Bpert = alloc_array(nk, nb_dm*nb_dm);
 	trace_sq_ddm_tot = 0;
@@ -71,7 +77,7 @@ void electron::compute_dm_Bpert_1st(vector3<> Bpert, double t0){
 		for (int i = 0; i < nb_dm; i++)
 		for (int j = i; j < nb_dm; j++){
 			complex H1 = Bpert[0] * s[ik][0][i*nb_dm + j] + Bpert[1] * s[ik][1][i*nb_dm + j] + Bpert[2] * s[ik][2][i*nb_dm + j];
-			if (needL){
+			if (needL && pertL){
 				H1 = 0.5 * (2.0023193043625635*H1 + Bpert[0] * l[ik][0][i*nb_dm + j] + Bpert[1] * l[ik][1][i*nb_dm + j] + Bpert[2] * l[ik][2][i*nb_dm + j]);
 			}
 			double dfde;

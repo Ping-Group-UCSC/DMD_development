@@ -32,6 +32,7 @@ public:
 	bool gfac_normal_dist; bool gfac_k_resolved;
 	double gfac_mean, gfac_sigma, gfac_cap;
 	bool needL;
+	bool pertL;
 
 	vector3<double> lattvec1, lattvec2, lattvec3;
 	matrix3<> R;
