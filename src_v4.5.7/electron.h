@@ -181,6 +181,7 @@ public:
 	void deg_proj(complex *m, double *e, int n, double thr, complex *mdeg);
 	void compute_b2(double de, double degauss, double degthr);
 	void compute_b2(double de, double degauss, double degthr, bool rotate_spin_axes);
+	void compute_b2(double de, double degauss, double degthr, bool rotate_spin_axes, bool doL);
 	void compute_Bin2();
 	void compute_Bin2(bool rotate_spin_axes);
 	double average_dfde(double **arr, double **f, int n1, int nb, bool inv = false);
