@@ -68,7 +68,7 @@ void dm_dynamics_jdftx(parameters* param){
 	if (alg.scatt_enable && alg.linearize && param->need_imsig) eph->compute_imsig();
 	if (alg.scatt_enable){
         if (elec->needL)
-            eph->analyse_g2(param->de_measure, param->degauss_measure, param->degthr);
+            eph->analyse_g2l(param->de_measure, param->degauss_measure, param->degthr);
         else
             eph->analyse_g2(param->de_measure, param->degauss_measure, param->degthr);
     }
