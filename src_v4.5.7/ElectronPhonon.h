@@ -131,7 +131,8 @@ public:
 	matrix3<> compute_conductivity_brange(double ***dfdEfield, double ***v, int bStart, int bEnd);//return conductivity
 	matrix3<> compute_mobility_brange(matrix3<> cond, double **f, int bStart, int bEnd, string scarr, bool print = true);//return conductivity
 	void write_conductivity(matrix3<> cond);
-	void analyse_g2(double de, double degauss, double degthr);
+	void analyse_g2(double de, double degauss, double degthr); //!< Compute Spinflip matrix elements
+	void analyse_g2l(double de, double degauss, double degthr); //!< Compute Spinflip and OrbFlip matrix elements
 	void analyse_g2_ei(double de, double degauss, double degthr);
 
 	// Linearize the scattering term of the density-matrix master equation

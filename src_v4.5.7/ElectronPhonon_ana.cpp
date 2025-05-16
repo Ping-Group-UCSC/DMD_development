@@ -410,6 +410,532 @@ void electronphonon::analyse_g2(double de, double degauss, double degthr){
 	dealloc_real_array(gsf2q); dealloc_real_array(Nsfq); dealloc_real_array(gsc2q); dealloc_real_array(Nscq);
 }
 
+
+void electronphonon::analyse_g2l(double de, double degauss, double degthr){
+	int nfile_gm = last_file_index("ldbd_data/ldbd_gm.bin.", "") + 1,
+		nfile_wq = last_file_index("ldbd_data/ldbd_wq_kpair.bin.", "") + 1;
+	if (!exists("ldbd_data/ldbd_gm.bin.0") || mp->nprocs != nfile_gm || mp->nprocs != nfile_wq) return;
+	if (ionode) printf("\n");
+	if (ionode) printf("**************************************************\n");
+	if (ionode) printf("analyse g2l for e-ph\n");
+	if (ionode) printf("**************************************************\n");
+	if (ionode && !is_dir("eph_analysis")) system("mkdir eph_analysis");
+
+	// read electron energy range
+	double ebot, etop;
+	FILE *fp = fopen("ldbd_data/ldbd_size.dat", "r");
+	char stmp[200];
+	for (int i = 0; i < 8; i++)
+		fgets(stmp, sizeof stmp, fp);
+	if (fgets(stmp, sizeof stmp, fp) != NULL){
+		double dtmp1, dtmp2, dtmp3, dtmp4;
+		sscanf(stmp, "%le %le %le %le %le %le", &dtmp1, &dtmp2, &dtmp3, &dtmp4, &ebot, &etop); if (ionode) printf("ebot = %14.7le eV etop = %14.7le eV\n", ebot / eV, etop / eV);
+	}
+	if (nv > 0 && elec->evmax <= ebot) error_message("evmax <= ebot", "analyse_g2");
+	if (nb > nv && elec->ecmin >= etop) error_message("ecmin >= etop", "analyse_g2");
+	fclose(fp);
+
+	// transition energy grids
+	double wstep = 0.001 * eV;
+	int nw = round(std::min(ph->omega_max, etop - ebot) / wstep) + 1; // energy step 1 meV
+	std::vector<double> wgrid(nw);
+	for (int iw = 1; iw < nw; iw++)
+		wgrid[iw] = wgrid[iw - 1] + wstep;
+
+	// electron energy grids
+	double gap = elec->ecmin - elec->evmax;
+	int ne_v, ne_c, ne;
+	std::vector<double> egrid;
+	if (nv > 0 && nb > nv && gap <= 1.002*de){
+		ne = ceil((etop - ebot) / de);
+		egrid.resize(ne, 0);
+		egrid[0] = ebot;
+		for (int ie = 1; ie < ne; ie++)
+			egrid[ie] = egrid[ie - 1] + de;
+	}
+	else{
+		ne_v = nv > 0 ? ceil((elec->evmax - ebot) / de) + 1 : 0;
+		ne_c = nb > nv ? ceil((etop - elec->ecmin) / de) + 1 : 0;
+		ne = ne_v + ne_c;
+		egrid.resize(ne, 0);
+		if (ne_v > 0) egrid[ne_v - 1] = elec->evmax + 0.501 * de; // shift a little to ensure vbm is closer to egrid[ne_v - 2] than egrid[ne_v - 1]
+		for (int ie = ne_v - 2; ie >= 0; ie--)
+			egrid[ie] = egrid[ie + 1] - de;
+		if (ne_c > 0) egrid[ne_v] = elec->ecmin - 0.501 * de; // shift a little to ensure cbm is closer to egrid[ne_v + 1] than egrid[ne_v]
+		for (int ie = ne_v + 1; ie < ne; ie++)
+			egrid[ie] = egrid[ie - 1] + de;
+	}
+
+	// q length grids
+	double dql = ph->qmin;
+	double qmax = ph->qmax;
+	if (alg.only_intravalley || alg.only_intervalley || latt->vpos.size() >= 2){
+		qmax = dql;
+		for (size_t ik = 0; ik < nk_glob; ik++)
+		for (size_t jk = ik + 1; jk < nk_glob; jk++){
+			int iv1, iv2;
+			if (!latt->kpair_is_allowed(elec->kvec[ik], elec->kvec[jk], iv1, iv2)) continue;
+			double qlength = latt->qana(elec->kvec[ik], elec->kvec[jk], iv1, iv2);
+			if (qlength > qmax){
+				qmax = qlength;
+				//if (ionode)
+				//	printf("k1: %lg %lg %lg (%d)  k2: %lg %lg %lg (%d)  q= %lg\n",
+				//		elec->kvec[ik][0], elec->kvec[ik][1], elec->kvec[ik][2], iv1,
+				//		elec->kvec[jk][0], elec->kvec[jk][1], elec->kvec[jk][2], iv2, qmax);
+			}
+		}
+	}
+
+	int nql = ceil(qmax / dql) + 1;
+	std::vector<double> qlgrid(nql);
+	qlgrid[0] = 0;
+	for (int iql = 1; iql < nql; iql++)
+		qlgrid[iql] = qlgrid[iql - 1] + dql;
+
+	// occupation
+	double **f = alloc_real_array(nk_glob, nb);
+	trunc_copy_array(f, elec->f_dm, nk_glob, bStart, bEnd);
+
+	double sum_dfde = 0;
+	for (int ik = 0; ik < nk_glob; ik++){
+		for (int b = 0; b < nb; b++)
+			sum_dfde += f[ik][b] * (1 - f[ik][b]);
+	}
+
+	//*****************************************************************
+	// frequency-dependent spin-flip/conserving overlap square and number of spin-flip/conserving transitions are defined as
+	// gsf2_{kn}(w) = (1/Nsf_{kn}(w)) (1/Nk) sum_{k'n'} |g_{kn,k'n'}|^2 step(spin-flip) delta(e_{kn}-e{k'n'}+-w) 
+	// Nsf_{kn}(w) = (1/Nk) sum_{k'n'} step(spin-flip) delta(e_{kn}-e{k'n'}+-w)
+	// gsc2_{kn}(w) = (1/Nsc_{kn}(w)) (1/Nk) sum_{k'n'} |g_{kn,k'n'}|^2 step(spin-conserving) delta(e_{kn}-e{k'n'}+-w)
+	// Nsf_{kn}(w) = (1/Nk) sum_{k'n'} step(spin-flip) delta(e_{kn}-e{k'n'}+-w)
+	//
+	// glf2_{kn}(w) = (1/Nlf_{kn}(w)) (1/Nk) sum_{k'n'} |g_{kn,k'n'}|^2 step(orb-flip) delta(e_{kn}-e{k'n'}+-w) 
+	// Nlf_{kn}(w) = (1/Nk) sum_{k'n'} step(orb-flip) delta(e_{kn}-e{k'n'}+-w)
+	// glc2_{kn}(w) = (1/Nlc_{kn}(w)) (1/Nk) sum_{k'n'} |g_{kn,k'n'}|^2 step(orb-conserving) delta(e_{kn}-e{k'n'}+-w)
+	// Nlf_{kn}(w) = (1/Nk) sum_{k'n'} step(orb-flip) delta(e_{kn}-e{k'n'}+-w)
+	//*****************************************************************
+
+	double ***gsf2ew = alloc_real_array(3, ne, nw), ***Nsfew = alloc_real_array(3, ne, nw),
+		***gsc2ew = alloc_real_array(3, ne, nw), ***Nscew = alloc_real_array(3, ne, nw);
+	double **gsf2w_avg = alloc_real_array(3, nw), **Nsfw = alloc_real_array(3, nw),
+		**gsc2w_avg = alloc_real_array(3, nw), **Nscw = alloc_real_array(3, nw);
+	double **gsc2q = alloc_real_array(3, nql), **Nscq = alloc_real_array(3, nql),
+		**gsf2q = alloc_real_array(3, nql), **Nsfq = alloc_real_array(3, nql);
+
+	double ***glf2ew = alloc_real_array(3, ne, nw), ***Nlfew = alloc_real_array(3, ne, nw),
+		***glc2ew = alloc_real_array(3, ne, nw), ***Nlcew = alloc_real_array(3, ne, nw);
+	double **glf2w_avg = alloc_real_array(3, nw), **Nlfw = alloc_real_array(3, nw),
+		**glc2w_avg = alloc_real_array(3, nw), **Nlcw = alloc_real_array(3, nw);
+	double **glc2q = alloc_real_array(3, nql), **Nlcq = alloc_real_array(3, nql),
+		**glf2q = alloc_real_array(3, nql), **Nlfq = alloc_real_array(3, nql);
+
+	MPI_Barrier(MPI_COMM_WORLD);
+	string fname_gm = "ldbd_data/ldbd_gm.bin." + int2str(mp->myrank),
+		fname_wq = "ldbd_data/ldbd_wq_kpair.bin." + int2str(mp->myrank);
+	if (ionode) printf("read %s and %s\n", fname_gm.c_str(), fname_wq.c_str());
+	//printf("rank %d read %s and %s\n", mp->myrank, fname_gm.c_str(), fname_wq.c_str());
+	FILE *fpgm = fopen(fname_gm.c_str(), "rb"), *fpwq = fopen(fname_wq.c_str(), "rb");
+	/*
+	size_t fgm_size = file_size(fpgm), fwq_size = file_size(fpwq);
+	if (fgm_size % (16 * nm * nb * nb) != 0)
+		error_message("fgm_size % (16 * nm * nb * nb) != 0", "electronphonon::analyse_g2");
+	if (fwq_size % (8 * nm) != 0)
+		error_message("fwq_size % (8 * nm) != 0", "electronphonon::analyse_g2");
+	int n_index_g = fgm_size / (16 * nm * nb * nb), n_index_w = fwq_size / (8 * nm);
+	if (n_index_g != n_index_w)
+		error_message("n_index_g != n_index_w", "electronphonon::analyse_g2");
+	printf("rank %d  n_index_g= %d\n", mp->myrank, n_index_g);
+	complex ***g = alloc_array(n_index_g, nm, nb*nb);
+	double **wq = alloc_real_array(n_index_g, nm);
+	for (int i = 0; i < n_index_g; i++){
+		printf("rank %d  i= %d\n", mp->myrank, i);
+		fread(g[i][0], 2 * sizeof(double), nm*nb*nb, fpgm);
+		fread(wq[i], sizeof(double), nm, fpwq);
+	}
+	fclose(fpgm); fclose(fpwq);
+	MPI_Barrier(MPI_COMM_WORLD);
+	printf("rank %d  fsize= %lu  fsize= %lu\n", mp->myrank, fgm_size, fwq_size);
+	MPI_Barrier(MPI_COMM_WORLD);
+	*/
+	//size_t expected_size = nkpair_proc*nb*nb * 2 * sizeof(double); // not right
+	//check_file_size(fpgm, expected_size, fname_gm + " size does not match expected size");
+	//expected_size = nkpair_proc*nm * sizeof(double); // not right
+	//check_file_size(fpwq, expected_size, fname_wq + " size does not match expected size");
+
+	bool isI[nk_glob];
+	bool ilI[nk_glob];
+	double sum_g2nq[nb*nb], sum_gl2nq[nb*nb], **eig_sdeg = alloc_real_array(nk_glob, nb), **eig_ldeg = alloc_real_array(nk_glob, nb) ; // eigenvalues of energy-degeneracy projections of spin matrices
+	complex g[nb*nb], gl[nb*nb], mtmp[nb*nb], **U_sdeg = alloc_array(nk_glob, nb*nb), **U_ldeg = alloc_array(nk_glob, nb*nb);
+
+	std::vector<double> nstates_e(ne);
+	size_t count_nk_deg = 0;
+	vector3<double> min_ds(1, 1, 1);
+	vector3<double> min_dl(1, 1, 1);
+	std::vector<std::vector<int>> ie_ik(nk_glob, std::vector<int>(nb));
+
+	double prefac_gaussexp = -0.5 / std::pow(degauss, 2);
+	MPI_Barrier(MPI_COMM_WORLD);
+	for (int id = 2; id >= 0; id--){
+		// diagonalize spin matrices in energy-degenerate subspaces
+		for (int ik = 0; ik < nk_glob; ik++){
+			isI[ik] = diagonalize_deg(elec->s[ik][id], e[ik], nb, degthr, eig_sdeg[ik], U_sdeg[ik]);
+			ilI[ik] = diagonalize_deg(elec->l[ik][id], e[ik], nb, degthr, eig_ldeg[ik], U_ldeg[ik]);
+			if (id == 2 && !isI[ik]) count_nk_deg++;
+
+			// determine energy index of e[ik][b1] in egrid
+			if (id == 2){ // run once
+				for (int b1 = 0; b1 < nb; b1++){
+					ie_ik[ik][b1] = b1 < nv ?
+						round((e[ik][b1] - egrid[0]) / de) :
+						round((e[ik][b1] - egrid[ne_v]) / de) + ne_v;
+					int ie1 = ie_ik[ik][b1];
+					if (ie1 >= 0 && ie1 < ne){
+						nstates_e[ie1] += 1;
+						if (fabs(e[ik][b1] - egrid[ie1]) > 0.501*de){
+							printf("e[%d][%d]= %14.7le egrid[%d]= %14.7le 0.501*de= %14.7le\n", ik, b1, e[ik][b1], ie1, egrid[ie1], 0.501*de);
+							error_message("|e[ik][b1] - egrid[ie1]| > 0.501*de", "analyse_g2");
+						}
+					}
+				}
+			}
+		}
+
+		MPI_Barrier(MPI_COMM_WORLD);
+		rewind(fpgm); rewind(fpwq);
+		int index_g = 0;
+		for (int ikpair_local = 0; ikpair_local < nkpair_proc; ikpair_local++){
+			int ik0 = k1st[ikpair_local];
+			int jk0 = k2nd[ikpair_local];
+			int iv1, iv2;
+			//printf("rank %d  ik0= %d  jk0= %d  ikpair= %d (%d)\n", mp->myrank, ik0, jk0, ikpair_local, nkpair_proc);
+			//printf("rank %d k1: %lg %lg %lg  k2: %lg %lg %lg\n", mp->myrank,
+			//	elec->kvec[ik0][0], elec->kvec[ik0][1], elec->kvec[ik0][2],
+			//	elec->kvec[jk0][0], elec->kvec[jk0][1], elec->kvec[jk0][2]);
+			bool kpair_is_allowed = latt->kpair_is_allowed(elec->kvec[ik0], elec->kvec[jk0], iv1, iv2);
+			//printf("rank %d kpair_is_allowed = %d\n", mp->myrank, kpair_is_allowed);
+			double qlength = latt->qana(elec->kvec[ik0], elec->kvec[jk0], iv1, iv2);
+			//double qlength = latt->klength(elec->kvec[ik0] - elec->kvec[jk0]);
+			//printf("rank %d qlength = %lg\n", mp->myrank, qlength);
+			int iql = round(qlength / dql);
+			//printf("rank %d iql = %d dql = %lg\n", mp->myrank, iql, dql);
+			if (kpair_is_allowed && (iql < 0 || iql >= nql)) error_message("iql < 0 || iql >= nql", "analyse_g2");
+			//printf("rank %d k1: %lg %lg %lg (%d)  k2: %lg %lg %lg (%d)  q= %lg\n", mp->myrank,
+			//	elec->kvec[ik0][0], elec->kvec[ik0][1], elec->kvec[ik0][2], iv1,
+			//	elec->kvec[jk0][0], elec->kvec[jk0][1], elec->kvec[jk0][2], iv2, qlength);
+
+			int nrun = (ik0 == jk0) ? 1 : 2;
+			for (int irun = 0; irun < nrun; irun++){
+				int ik, jk;
+				if (irun == 0){ ik = ik0; jk = jk0; }
+				else{ ik = jk0; jk = ik0; }
+				index_g++;
+				//printf("rank %d  ik= %d  jk= %d\n", mp->myrank, ik, jk);
+
+				zeros(sum_g2nq, nb*nb);
+				zeros(sum_gl2nq, nb*nb);
+				//printf("rank %d debug 1\n", mp->myrank);
+				for (int im = 0; im < nm; im++){
+					//printf("rank %d  im= %d  fpgm= %lu\n", mp->myrank, im, ftell(fpgm));
+					if (fread(g, 2 * sizeof(double), nb*nb, fpgm) == nb*nb){}
+					else { error_message("error during reading gm", "analyse_g2"); }
+					//printf("rank %d  fpgm= %lu\n", mp->myrank, ftell(fpgm));
+
+					double wq;
+					//printf("rank %d  fpwq= %lu\n", mp->myrank, ftell(fpwq));
+					if (fread(&wq, sizeof(double), 1, fpwq) == 1){}
+					else { error_message("error during reading wq", "analyse_g2"); }
+					//printf("rank %d  fpwq= %lu\n", mp->myrank, ftell(fpwq));
+
+					if (!kpair_is_allowed) continue;
+					//printf("rank %d  wq= %lg\n", mp->myrank, wq);
+					if (im < ph->modeStart || im >= ph->modeEnd) continue;
+
+					double nq = ph->bose(elec->temperature, wq);
+					//double nq = ph->bose(elec->temperature, wq[index_g][im]);
+					//printf("rank %d  nq= %lg\n", mp->myrank, nq);
+
+					transpose(g, mtmp, nb); // from Fortran to C
+					if (irun == 0) axbyc(g, mtmp, nb*nb);
+					else hermite(mtmp, g, nb);
+					//transpose(g[index_g][im], mtmp, nb); // from Fortran to C
+					//if (irun == 0) axbyc(g[index_g][im], mtmp, nb*nb);
+					//else hermite(mtmp, g[index_g][im], nb);
+					//printf("rank %d  |g[0,0]|^2= %lg   |g[1,1]|^2= %lg\n", mp->myrank, g[index_g][im][0].norm(), g[index_g][im][nb + 1].norm());
+
+					if (!isI[jk]) zgemm_interface(mtmp, g, U_sdeg[jk], nb);
+					if (!isI[jk]) zgemm_interface(mtmp, g, U_ldeg[jk], nb);
+					if (!isI[ik]) zgemm_interface(g, U_sdeg[ik], mtmp, nb, c1, c0, CblasConjTrans);
+					if (!isI[ik]) zgemm_interface(g, U_ldeg[ik], mtmp, nb, c1, c0, CblasConjTrans);
+					//if (!isI[jk]) zgemm_interface(mtmp, g[index_g][im], U_sdeg[jk], nb);
+					//if (!isI[ik]) zgemm_interface(g[index_g][im], U_sdeg[ik], mtmp, nb, c1, c0, CblasConjTrans);
+
+					for (int b1 = 0; b1 < nb; b1++)
+					for (int b2 = 0; b2 < nb; b2++)
+						sum_g2nq[b1*nb + b2] += g[b1*nb + b2].norm() * nq;
+						//sum_g2nq[b1*nb + b2] += g[index_g][im][b1*nb + b2].norm() * nq;
+					//printf("rank %d  |sum_g2nq[0,0]|^2= %lg   |sum_g2nq[1,1]|^2= %lg\n", mp->myrank, sum_g2nq[0], sum_g2nq[nb + 1]);
+				}
+
+				if (!kpair_is_allowed) continue;
+				//printf("rank %d debug 2\n", mp->myrank);
+
+				for (int b1 = 0; b1 < nb; b1++){
+					int ie1 = ie_ik[ik][b1];
+					if (ie1 < 0 || ie1 >= ne) continue;
+
+					for (int b2 = 0; b2 < nb; b2++){
+						bool step_sf = eig_sdeg[ik][b1] * eig_sdeg[jk][b2] < 0; // true for a spin-flip transition
+						bool step_lf = eig_ldeg[ik][b1] * eig_ldeg[jk][b2] < 0; // true for a orb-flip transition
+						if (step_sf && abs(eig_sdeg[ik][b1] - eig_sdeg[jk][b2]) < min_ds[id])
+							min_ds[id] = abs(eig_sdeg[ik][b1] - eig_sdeg[jk][b2]);
+
+						if (step_lf && abs(eig_ldeg[ik][b1] - eig_ldeg[jk][b2]) < min_dl[id])
+							min_dl[id] = abs(eig_ldeg[ik][b1] - eig_ldeg[jk][b2]);
+
+						//printf("rank %d b1= %d b2= %d step_sf= %d\n", mp->myrank, b1, b2, step_sf);
+						double f2f1bar = f[jk][b2] * (1 - f[ik][b1]);
+						double f1f2bar = f[ik][b1] * (1 - f[jk][b2]);
+
+						// transition energy w distribution
+						double de = e[ik][b1] - e[jk][b2];
+						for (int iw = 0; iw < nw; iw++){
+							double delta_minus = exp(prefac_gaussexp * std::pow(de - wgrid[iw], 2)); // gaussian delta without prefactor
+							double delta_plus = exp(prefac_gaussexp * std::pow(de + wgrid[iw], 2)); // gaussian delta without prefactor
+							double weight_g2ew = delta_minus + delta_plus;
+							double weight_g2w = f2f1bar * delta_minus + f1f2bar * delta_plus;
+
+							if (step_sf){
+								// frequency-dependent spin-flip overlap square and number of spin-flip transitions
+								gsf2ew[id][ie1][iw] += sum_g2nq[b1*nb + b2] * weight_g2ew;
+								Nsfew[id][ie1][iw] += weight_g2ew;
+								gsf2w_avg[id][iw] += sum_g2nq[b1*nb + b2] * weight_g2w;
+								Nsfw[id][iw] += weight_g2w;
+							}
+							else{
+								// frequency-dependent spin-conserving overlap square and number of spin-conserving transitions
+								gsc2ew[id][ie1][iw] += sum_g2nq[b1*nb + b2] * weight_g2ew;
+								Nscew[id][ie1][iw] += weight_g2ew;
+								gsc2w_avg[id][iw] += sum_g2nq[b1*nb + b2] * weight_g2w;
+								Nscw[id][iw] += weight_g2w;
+							}
+
+						if (step_lf){
+								// frequency-dependent spin-flip overlap square and number of spin-flip transitions
+								glf2ew[id][ie1][iw] += sum_g2nq[b1*nb + b2] * weight_g2ew;
+								Nlfew[id][ie1][iw] += weight_g2ew;
+								glf2w_avg[id][iw] += sum_g2nq[b1*nb + b2] * weight_g2w;
+								Nlfw[id][iw] += weight_g2w;
+							}
+							else{
+								// frequency-dependent spin-conserving overlap square and number of spin-conserving transitions
+								glc2ew[id][ie1][iw] += sum_g2nq[b1*nb + b2] * weight_g2ew;
+								Nlcew[id][ie1][iw] += weight_g2ew;
+								glc2w_avg[id][iw] += sum_g2nq[b1*nb + b2] * weight_g2w;
+								Nlcw[id][iw] += weight_g2w;
+							}
+						}
+
+						// q-length distribution
+						if (step_sf){
+							gsf2q[id][iql] += sum_g2nq[b1*nb + b2];
+							Nsfq[id][iql] += 1;
+						}
+						else{
+							gsc2q[id][iql] += sum_g2nq[b1*nb + b2];
+							Nscq[id][iql] += 1;
+						}
+
+						if (step_lf){
+							glf2q[id][iql] += sum_g2nq[b1*nb + b2];
+							Nlfq[id][iql] += 1;
+						}
+						else{
+							glc2q[id][iql] += sum_g2nq[b1*nb + b2];
+							Nlcq[id][iql] += 1;
+						}
+					}
+				}
+				//printf("rank %d debug 3\n", mp->myrank);
+			}
+		}
+		MPI_Barrier(MPI_COMM_WORLD);
+		// collecting data
+		mp->allreduce(gsf2ew[id], ne, nw, MPI_SUM); mp->allreduce(Nsfew[id], ne, nw, MPI_SUM);
+		mp->allreduce(gsc2ew[id], ne, nw, MPI_SUM); mp->allreduce(Nscew[id], ne, nw, MPI_SUM);
+		mp->allreduce(min_ds[id], MPI_MIN);
+
+		mp->allreduce(glf2ew[id], ne, nw, MPI_SUM); mp->allreduce(Nlfew[id], ne, nw, MPI_SUM);
+		mp->allreduce(glc2ew[id], ne, nw, MPI_SUM); mp->allreduce(Nlcew[id], ne, nw, MPI_SUM);
+		mp->allreduce(min_ds[id], MPI_MIN);
+	}
+	fclose(fpgm); fclose(fpwq);
+	//dealloc_real_array(wq);
+	//for (int i = 0; i < n_index_g; i++){ dealloc_array(g[i]); }
+	// collecting data
+	mp->allreduce(gsf2w_avg, 3, nw, MPI_SUM); mp->allreduce(Nsfw, 3, nw, MPI_SUM);
+	mp->allreduce(gsc2w_avg, 3, nw, MPI_SUM); mp->allreduce(Nscw, 3, nw, MPI_SUM);
+	mp->allreduce(gsf2q, 3, nql, MPI_SUM); mp->allreduce(Nsfq, 3, nql, MPI_SUM);
+	mp->allreduce(gsc2q, 3, nql, MPI_SUM); mp->allreduce(Nscq, 3, nql, MPI_SUM);
+
+	mp->allreduce(glf2w_avg, 3, nw, MPI_SUM); mp->allreduce(Nlfw, 3, nw, MPI_SUM);
+	mp->allreduce(glc2w_avg, 3, nw, MPI_SUM); mp->allreduce(Nlcw, 3, nw, MPI_SUM);
+	mp->allreduce(glf2q, 3, nql, MPI_SUM); mp->allreduce(Nlfq, 3, nql, MPI_SUM);
+	mp->allreduce(glc2q, 3, nql, MPI_SUM); mp->allreduce(Nlcq, 3, nql, MPI_SUM);
+	// useful information
+	if (ionode){
+		printf("no. of k with energy degeneracy (tot no. of k): %lu (%d)\n", count_nk_deg, nk_glob);
+		printf("min. spin change along x: %lg\n", min_ds[0]);
+		printf("min. spin change along y: %lg\n", min_ds[1]);
+		printf("min. spin change along z: %lg\n", min_ds[2]); fflush(stdout);
+	}
+	if (ionode){
+		printf("min. orb change along x: %lg\n", min_dl[0]);
+		printf("min. orb change along y: %lg\n", min_dl[1]);
+		printf("min. orb change along z: %lg\n", min_dl[2]); fflush(stdout);
+	}
+	// divide normalization factor
+	double prefac_gauss = 1. / (sqrt(2 * M_PI) * degauss);
+	double prefac_Nw = prefac_gauss / elec->nk_full / elec->nk_full;
+	for (int id = 2; id >= 0; id--){
+		for (int ie = 0; ie < ne; ie++){
+			double prefac_New = prefac_gauss / elec->nk_full / nstates_e[ie];
+			for (int iw = 0; iw < nw; iw++){
+				gsf2ew[id][ie][iw] = gsf2ew[id][ie][iw] / Nsfew[id][ie][iw];
+				gsc2ew[id][ie][iw] = gsc2ew[id][ie][iw] / Nscew[id][ie][iw];
+				Nsfew[id][ie][iw] *= prefac_New;
+				Nscew[id][ie][iw] *= prefac_New;
+
+				glf2ew[id][ie][iw] = glf2ew[id][ie][iw] / Nlfew[id][ie][iw];
+				glc2ew[id][ie][iw] = glc2ew[id][ie][iw] / Nlcew[id][ie][iw];
+				Nlfew[id][ie][iw] *= prefac_New;
+				Nlcew[id][ie][iw] *= prefac_New;
+			}
+		}
+		for (int iw = 0; iw < nw; iw++){
+			gsf2w_avg[id][iw] = gsf2w_avg[id][iw] / Nsfw[id][iw];
+			gsc2w_avg[id][iw] = gsc2w_avg[id][iw] / Nscw[id][iw];
+			Nsfw[id][iw] *= prefac_Nw;
+			Nscw[id][iw] *= prefac_Nw;
+
+			glf2w_avg[id][iw] = glf2w_avg[id][iw] / Nlfw[id][iw];
+			glc2w_avg[id][iw] = glc2w_avg[id][iw] / Nlcw[id][iw];
+			Nlfw[id][iw] *= prefac_Nw;
+			Nlcw[id][iw] *= prefac_Nw;
+		}
+		for (int iql = 0; iql < nql; iql++){
+			gsf2q[id][iql] = gsf2q[id][iql] / Nsfq[id][iql];
+			gsc2q[id][iql] = gsc2q[id][iql] / Nscq[id][iql];
+
+			glf2q[id][iql] = glf2q[id][iql] / Nlfq[id][iql];
+			glc2q[id][iql] = glc2q[id][iql] / Nlcq[id][iql];
+		}
+	}
+
+	// output frequency-dependent spin-flip/conserving overlap square and number of spin-flip/conserving transitions
+	if (ionode){
+		sum_dfde /= elec->nk_full;
+		string sdir[3]; sdir[0] = "x"; sdir[1] = "y"; sdir[2] = "z";
+		for (int id = 2; id >= 0; id--){
+			string fnamesf = "eph_analysis/gsf2w_" + sdir[id] + ".out",
+				fnamesc = "eph_analysis/gsc2w_" + sdir[id] + ".out";
+			FILE *fpsf = fopen(fnamesf.c_str(), "w"),
+				*fpsc = fopen(fnamesc.c_str(), "w");
+			fprintf(fpsf, "# transition energy (meV) gsf2w Nsfw gsf2*Nsf/Nf\n");
+			fprintf(fpsc, "# transition energy (meV) gsc2w Nscw gsc2*Nsc/Nf\n");
+			for (int iw = 0; iw < nw; iw++){
+				fprintf(fpsf, "%14.7le %14.7le %14.7le %14.7le\n", wgrid[iw] / eV * 1000, gsf2w_avg[id][iw], Nsfw[id][iw], gsf2w_avg[id][iw] * Nsfw[id][iw] / sum_dfde);
+				fprintf(fpsc, "%14.7le %14.7le %14.7le %14.7le\n", wgrid[iw] / eV * 1000, gsc2w_avg[id][iw], Nscw[id][iw], gsc2w_avg[id][iw] * Nscw[id][iw] / sum_dfde);
+			}
+			fclose(fpsf); fclose(fpsc);
+
+			for (int iw = 0; iw < nw; iw++){
+				string fnamesf = "eph_analysis/gsf2ew_" + sdir[id] + "_w" + int2str(iw) + ".out",
+					fnamesc = "eph_analysis/gsc2ew_" + sdir[id] + "_w" + int2str(iw) + ".out";
+				FILE *fpsf = fopen(fnamesf.c_str(), "w"),
+					*fpsc = fopen(fnamesc.c_str(), "w");
+				fprintf(fpsf, "# elec. energy (eV) gsf2ew Nsfew gsf2e*Nsfe (for transition energy: %lg meV)\n", wgrid[iw] / eV * 1000);
+				fprintf(fpsc, "# elec. energy (eV) gsc2ew Nscew gsc2e*Nsce (for transition energy: %lg meV)\n", wgrid[iw] / eV * 1000);
+				for (int ie = 0; ie < ne; ie++){
+					fprintf(fpsf, "%14.7le %14.7le %14.7le %14.7le\n", egrid[ie] / eV, gsf2ew[id][ie][iw], Nsfew[id][ie][iw], gsf2ew[id][ie][iw] * Nsfew[id][ie][iw]);
+					fprintf(fpsc, "%14.7le %14.7le %14.7le %14.7le\n", egrid[ie] / eV, gsc2ew[id][ie][iw], Nscew[id][ie][iw], gsc2ew[id][ie][iw] * Nscew[id][ie][iw]);
+				}
+				fclose(fpsf); fclose(fpsc);
+			}
+
+			fnamesf = "eph_analysis/gsf2q_" + sdir[id] + ".out"; fnamesc = "eph_analysis/gsc2q_" + sdir[id] + ".out";
+			fpsf = fopen(fnamesf.c_str(), "w"); fpsc = fopen(fnamesc.c_str(), "w");
+			fprintf(fpsf, "# q length (bohr^-1) gsf2q Nsfq\n");
+			fprintf(fpsc, "# q length (bohr^-1) gsc2q Nscq\n");
+			for (int iql = 0; iql < nql; iql++){
+				fprintf(fpsf, "%14.7le %14.7le %14.7le\n", qlgrid[iql], gsf2q[id][iql], Nsfq[id][iql]);
+				fprintf(fpsc, "%14.7le %14.7le %14.7le\n", qlgrid[iql], gsc2q[id][iql], Nscq[id][iql]);
+			}
+			fclose(fpsf); fclose(fpsc);
+		}
+
+		// dos
+		std::vector<double> dos(ne);
+		for (int ie = 0; ie < ne; ie++)
+			dos[ie] = nstates_e[ie] / de / elec->nk_full;
+		double sum_dossq = 0, sum_dos = 0;
+		for (int ie = 0; ie < ne; ie++){
+			double fe = electron::fermi(elec->temperature, elec->mu, egrid[ie]);
+			double dfde = fe * (1 - fe);
+			sum_dossq += dfde * dos[ie] * dos[ie];
+			sum_dos += dfde * dos[ie];
+		}
+		printf("effective scattering dos (inaccurate) = %14.7le\n", sum_dossq / sum_dos);
+	}
+	if (ionode){
+		sum_dfde /= elec->nk_full;
+		string sdir[3]; sdir[0] = "x"; sdir[1] = "y"; sdir[2] = "z";
+		for (int id = 2; id >= 0; id--){
+			string fnamesf = "eph_analysis/glf2w_" + sdir[id] + ".out",
+				fnamesc = "eph_analysis/glc2w_" + sdir[id] + ".out";
+			FILE *fpsf = fopen(fnamesf.c_str(), "w"),
+				*fpsc = fopen(fnamesc.c_str(), "w");
+			fprintf(fpsf, "# transition energy (meV) glf2w Nlfw glf2*Nlf/Nf\n");
+			fprintf(fpsc, "# transition energy (meV) glc2w Nlcw glc2*Nlc/Nf\n");
+			for (int iw = 0; iw < nw; iw++){
+				fprintf(fpsf, "%14.7le %14.7le %14.7le %14.7le\n", wgrid[iw] / eV * 1000, glf2w_avg[id][iw], Nlfw[id][iw], glf2w_avg[id][iw] * Nlfw[id][iw] / sum_dfde);
+				fprintf(fpsc, "%14.7le %14.7le %14.7le %14.7le\n", wgrid[iw] / eV * 1000, glc2w_avg[id][iw], Nlcw[id][iw], glc2w_avg[id][iw] * Nlcw[id][iw] / sum_dfde);
+			}
+			fclose(fpsf); fclose(fpsc);
+
+			for (int iw = 0; iw < nw; iw++){
+				string fnamesf = "eph_analysis/glf2ew_" + sdir[id] + "_w" + int2str(iw) + ".out",
+					fnamesc = "eph_analysis/glc2ew_" + sdir[id] + "_w" + int2str(iw) + ".out";
+				FILE *fpsf = fopen(fnamesf.c_str(), "w"),
+					*fpsc = fopen(fnamesc.c_str(), "w");
+				fprintf(fpsf, "# elec. energy (eV) glf2ew Nlfew glf2e*Nlfe (for transition energy: %lg meV)\n", wgrid[iw] / eV * 1000);
+				fprintf(fpsc, "# elec. energy (eV) glc2ew Nlcew glc2e*Nlce (for transition energy: %lg meV)\n", wgrid[iw] / eV * 1000);
+				for (int ie = 0; ie < ne; ie++){
+					fprintf(fpsf, "%14.7le %14.7le %14.7le %14.7le\n", egrid[ie] / eV, glf2ew[id][ie][iw], Nlfew[id][ie][iw], glf2ew[id][ie][iw] * Nlfew[id][ie][iw]);
+					fprintf(fpsc, "%14.7le %14.7le %14.7le %14.7le\n", egrid[ie] / eV, glc2ew[id][ie][iw], Nlcew[id][ie][iw], glc2ew[id][ie][iw] * Nlcew[id][ie][iw]);
+				}
+				fclose(fpsf); fclose(fpsc);
+			}
+
+			fnamesf = "eph_analysis/glf2q_" + sdir[id] + ".out"; fnamesc = "eph_analysis/glc2q_" + sdir[id] + ".out";
+			fpsf = fopen(fnamesf.c_str(), "w"); fpsc = fopen(fnamesc.c_str(), "w");
+			fprintf(fpsf, "# q length (bohr^-1) gsf2q Nsfq\n");
+			fprintf(fpsc, "# q length (bohr^-1) gsc2q Nscq\n");
+			for (int iql = 0; iql < nql; iql++){
+				fprintf(fpsf, "%14.7le %14.7le %14.7le\n", qlgrid[iql], glf2q[id][iql], Nlfq[id][iql]);
+				fprintf(fpsc, "%14.7le %14.7le %14.7le\n", qlgrid[iql], glc2q[id][iql], Nlcq[id][iql]);
+			}
+			fclose(fpsf); fclose(fpsc);
+		}
+	}
+
+	//deallocate memory
+	dealloc_real_array(f);
+	dealloc_real_array(eig_sdeg); dealloc_array(U_sdeg);
+	dealloc_real_array(gsf2ew); dealloc_real_array(Nsfew); dealloc_real_array(gsf2w_avg); dealloc_real_array(Nsfw);
+	dealloc_real_array(gsc2ew); dealloc_real_array(Nscew); dealloc_real_array(gsc2w_avg); dealloc_real_array(Nscw);
+	dealloc_real_array(gsf2q); dealloc_real_array(Nsfq); dealloc_real_array(gsc2q); dealloc_real_array(Nscq);
+}
+
 void electronphonon::analyse_g2_ei(double de, double degauss, double degthr){
 	int nfile_g = last_file_index("ldbd_data/ldbd_g.bin.", "") + 1;
 	if (!exists("ldbd_data/ldbd_g.bin.0") || mp->nprocs != nfile_g) return;

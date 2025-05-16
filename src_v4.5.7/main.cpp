@@ -66,7 +66,12 @@ void dm_dynamics_jdftx(parameters* param){
 	if (alg.scatt_enable) mpkpair.distribute_var("dm_dynamics_jdftx", eph->nkpair_glob);
 	if (alg.scatt_enable) eph->set_eph();
 	if (alg.scatt_enable && alg.linearize && param->need_imsig) eph->compute_imsig();
-	if (alg.scatt_enable) eph->analyse_g2(param->de_measure, param->degauss_measure, param->degthr);
+	if (alg.scatt_enable){
+        if (elec->needL)
+            eph->analyse_g2(param->de_measure, param->degauss_measure, param->degthr);
+        else
+            eph->analyse_g2(param->de_measure, param->degauss_measure, param->degthr);
+    }
 	if (alg.scatt_enable) eph->analyse_g2_ei(param->de_measure, param->degauss_measure, param->degthr);
 
 	MPI_Barrier(MPI_COMM_WORLD);
