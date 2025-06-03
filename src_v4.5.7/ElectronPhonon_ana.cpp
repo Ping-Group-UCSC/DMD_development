@@ -766,7 +766,7 @@ void electronphonon::analyse_g2l(double de, double degauss, double degthr){
 
 		mp->allreduce(glf2ew[id], ne, nw, MPI_SUM); mp->allreduce(Nlfew[id], ne, nw, MPI_SUM);
 		mp->allreduce(glc2ew[id], ne, nw, MPI_SUM); mp->allreduce(Nlcew[id], ne, nw, MPI_SUM);
-		mp->allreduce(min_ds[id], MPI_MIN);
+		mp->allreduce(min_dl[id], MPI_MIN);
 	}
 	fclose(fpgm); fclose(fpwq);
 	//dealloc_real_array(wq);
@@ -886,6 +886,7 @@ void electronphonon::analyse_g2l(double de, double degauss, double degthr){
 		}
 		printf("effective scattering dos (inaccurate) = %14.7le\n", sum_dossq / sum_dos);
 	}
+	// output frequency-dependent orbital-flip/conserving overlap square and number of orbital-flip/conserving transitions
 	if (ionode){
 		sum_dfde /= elec->nk_full;
 		string sdir[3]; sdir[0] = "x"; sdir[1] = "y"; sdir[2] = "z";
@@ -934,6 +935,11 @@ void electronphonon::analyse_g2l(double de, double degauss, double degthr){
 	dealloc_real_array(gsf2ew); dealloc_real_array(Nsfew); dealloc_real_array(gsf2w_avg); dealloc_real_array(Nsfw);
 	dealloc_real_array(gsc2ew); dealloc_real_array(Nscew); dealloc_real_array(gsc2w_avg); dealloc_real_array(Nscw);
 	dealloc_real_array(gsf2q); dealloc_real_array(Nsfq); dealloc_real_array(gsc2q); dealloc_real_array(Nscq);
+
+	dealloc_real_array(eig_ldeg); dealloc_array(U_ldeg);
+	dealloc_real_array(glf2ew); dealloc_real_array(Nlfew); dealloc_real_array(glf2w_avg); dealloc_real_array(Nlfw);
+	dealloc_real_array(glc2ew); dealloc_real_array(Nlcew); dealloc_real_array(glc2w_avg); dealloc_real_array(Nlcw);
+	dealloc_real_array(glf2q); dealloc_real_array(Nlfq); dealloc_real_array(glc2q); dealloc_real_array(Nlcq);
 }
 
 void electronphonon::analyse_g2_ei(double de, double degauss, double degthr){
