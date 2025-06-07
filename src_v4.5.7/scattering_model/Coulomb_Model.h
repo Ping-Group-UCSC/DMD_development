@@ -419,9 +419,13 @@ struct coulomb_model
 	{
 		if (ionode) printf("\nInitialize screening formula %s\n", clp.scrFormula.c_str());
 		if (ionode) printf("bStart = %d bEnd = %d nv = %d\n", bStart, bEnd, nv);
-		if (latt->dim < 3) error_message("debye screening model for lowD is not implemented");
+		//if (latt->dim < 3) error_message("debye screening model for lowD is not implemented");
+		if (latt->dim < 3 && clp.scrFormula != "RPA") error_message("ONLY RPA screening implemented for 2D systems");
 		prefac_vq = 4 * M_PI / clp.eps / latt->cell_size;
+		if (ionode) std::cout << "latt. cell size -> " << latt->cell_size << std::endl;
+		if (ionode) std::cout << "clp dynamic -> " << clp.dynamic << std::endl;
 		prefac_vq_bare = 4 * M_PI / latt->cell_size;
+		if (ionode) std::cout << "prefac vq: " << prefac_vq_bare << std::endl;
 		//if (ionode) printf("prefac_vq = %10.3le\n", prefac_vq);
 		e = trunc_alloccopy_array(elec->e_dm, nk, bStart, bEnd);
 		f = trunc_alloccopy_array(elec->f_dm, nk, bStart, bEnd);
@@ -444,7 +448,6 @@ struct coulomb_model
 			else nfreetot_corr += (elec->f_dm_morek[ik][i] - 1.); // hole concentration is negative
 		}
 		nfreetot_corr /= (nk_full * latt->cell_size);
-
 		//initialize qmap and qvec,
 		if (qmap == nullptr){
 			qmap = new qIndexMap(elec->kmesh); qmap->build(elec->kvec, qvec);
@@ -460,7 +463,8 @@ struct coulomb_model
 				fclose(fpq);
 			}
 		}
-
+		if (ionode) std::cout << "INITIALIZED qmap" << std::endl;
+		
 		kmap = new kIndexMap(elec->kmesh, elec->kvec);
 		if (ionode && DEBUG){
 			string fnamek = dir_debug + "kIndexMap.out";
@@ -492,7 +496,7 @@ struct coulomb_model
 			}
 			if (ionode) printf("qmin = %lg qmax = %lg\n", qmin, qmax);
 		}
-
+		
 		//find out wmax for each q
 		wqmax.resize(qvec.size(), 0);
 		for (int ik1 = 0; ik1 < nk; ik1++)
@@ -522,13 +526,21 @@ struct coulomb_model
 		if (clp.dynamic == "ppa" && clp.ppamodel == "gn") { omega.resize(2); omega[0] = c0; }
 		if (!(clp.dynamic == "ppa" && clp.ppamodel == "gn")) clp.smearing = (clp.smearing <= 0) ? 0.5 * T : clp.smearing;
 		if (ionode) printf("smearing = %10.3le a.u. (%10.3le meV / %10.3le K)\n", clp.smearing, clp.smearing / eV * 1000, clp.smearing / Kelvin);
-
+		
 		//mpi
 		mp = elec->mp;
-
+		if (ionode) std::cout << "scrFormula -> " << clp.scrFormula << std::endl;
 		//initialization for models and RPA
-		init_model(clp.nfreetot);
+		if (latt->dim == 2) {
+			if (ionode) std::cout << "BABBUINO !!!" << std::endl;
+			init_model_2D(clp.nfreetot);
+		}
+		else {
+			init_model(clp.nfreetot);
+		}
+		exit(1);
 		if (clp.scrFormula == "RPA") init_RPA();
+		exit(1);
 	}
 	void init(double **ft){
 		clp.nfreetot = 0;
@@ -584,13 +596,29 @@ struct coulomb_model
 				heg = new homogeneous_electron_gas(n, T, clp.meff, clp.eps, kF, vF, EF, qvec, iq_qmin, qmin, qmax, qmap, latt, wqmax, wp);
 		}
 	}
+	void init_model_2D(double n, FILE *fp = stdout){
+		if (ionode) std::cout << "screening formula: " << clp.scrFormula << std::endl;
+		if (ionode) std::cout << " -- OK -- " << std::endl;
+		if ((clp.scrFormula == "debye" || clp.scrFormula == "Bechstedt" || clp.scrFormula == "heg") && n <= 0)
+			error_message("nfreetot must be postive");
+		kF = std::pow(2 * M_PI * n, 1. / 2.);
+		vF = kF / clp.meff;
+		kF2 = kF*kF;
+		EF = kF2 / 2. / clp.meff;
+		if (ionode) printf("kF = %lg EF = %lg\n", kF, EF);
+		// TO BE COMPLETED
+		// debye screening - TF screening length
+	}
 	void init_RPA(double **ft = nullptr){
 		if (clp.eppa == 0) clp.eppa = sqrt(4 * M_PI * clp.nfreetot / clp.meff / clp.eps);
 		if (clp.dynamic == "ppa") omega[1] = ci * clp.eppa;
 		if (ft != nullptr) trunc_copy_array(f, ft, nk, 0, nb);
-
+		if (ionode) std::cout << "clp dynamic -> " << clp.dynamic << std::endl;
+		std::cout << "2D screening: " << clp.two_dim_screening_model << std::endl;
+		if (! clp.two_dim_screening_model) calc_2d_cutoff();
+		exit(1);
 		calc_qscr2_static_RPA();
-
+		
 		//determine frequency grids (for each q)		
 		if (clp.dynamic == "real-axis"){
 			domega = clp.omegamax / (clp.nomega - 1);
@@ -682,10 +710,19 @@ struct coulomb_model
 			if (w < 0) return result.conj(); // eps(q,-w)=eps(q,w)^*
 			else return result;
 		}
+		return 0;
 	}
 	void calc_ovlp(int ik, int jk){
 		hermite(elec->U[ik], Uih, elec->nb_wannier, nb);
 		zgemm_interface(ovlp, Uih, elec->U[jk], nb, nb, elec->nb_wannier);
+	}
+	void calc_2d_cutoff(){
+		if (latt->dim != 2) error_message("The system is not 2D");
+		if (latt->length < 1.e-7) error_message("lz = 0");
+		std::cout << "HERE COMPUTE 2D CUTOFF: CASO UMANO !!" << std::endl;
+		std::cout << "LATTICE lz : " << latt->length << std::endl;
+		std::cout << "LATTICE area: " << latt->area << std::endl;
+		std::cout << "LATTICE volume: " << latt->volume << std::endl;
 	}
 	void calc_qscr2_static_RPA(){
 		qscr2_static_RPA.resize(qvec.size(), c0);
@@ -719,8 +756,9 @@ struct coulomb_model
 		}
 		axbyc(qscr2_ref.data(), nullptr, qvec.size(), 0, complex(prefac_vq / nk_full, 0), c0); // y = ax + by + c
 		*/
-
+		std::cout << " OK -- " << std::endl;
 		for (int iq = 0; iq < qvec.size(); iq++){
+			if (ionode) std::cout << "iq --------> " << iq << std::endl;
 			for (int ik = mp->varstart; ik < mp->varend; ik++){
 				size_t jk = 0; vector3<> kj = elec->kvec[ik] - qvec[iq]; // not necessage to wrap k point around Gamma, kmap subroutines will wrap inside
 				if (kmap->findk(kj, jk)){
@@ -767,7 +805,7 @@ struct coulomb_model
 			string fnamevq = "qscr2_static_RPA.out";
 			FILE *fpvq = fopen(fnamevq.c_str(), "w");
 			init_model(clp.nfreetot, fpvq);
-			fprintf(fpvq, "#|q|^2 |q_scr|^2 |q_scr_ref|^2 |2nd q_scr|^2\n");
+			fprintf(fpvq, "#|q|^2 |q_scr|^2 |2nd q_scr|^2\n");
 			for (size_t iq = 0; iq < qvec.size(); iq++){
 				double q_length_square = latt->GGT.metric_length_squared(wrap(qvec[iq])); // qvec is already wrapped to [-0.5,0.5)
 				fprintf(fpvq, "%14.7le %14.7le %14.7le\n", q_length_square, abs(qscr2_static_RPA[iq]), abs(qscr2_2ndway[iq]));
@@ -817,7 +855,10 @@ struct coulomb_model
 				mp->allreduce(qscr2_RPA[iq][iw], MPI_SUM);
 				qscr2_RPA[iq][iw] = complex(prefac_vq / nk_full, 0) * qscr2_RPA[iq][iw];
 			}
+			std::cout << " iq -> " << iq << std::endl;
 		}
+		std::cout << "SEI ARRIVATO TESTA DI PIGNA" << std::endl;
+		exit(1);
 		if (clp.dynamic == "static" || clp.dynamic == "ppa"){
 			vq_RPA.resize(qvec.size());
 			for (size_t iq = 0; iq < qvec.size(); iq++){
@@ -830,7 +871,7 @@ struct coulomb_model
 			double wp2 = clp.eppa * clp.eppa;
 
 			/*
-			//If we use qscr^2(w) = A / (w^2 - wq^2), we can include q=0 in Godby¨CNeeds PPA
+			//If we use qscr^2(w) = A / (w^2 - wq^2), we can include q=0 in Godbyï¿½CNeeds PPA
 			Aq_ppa.resize(qvec.size()); Eq2_ppa.resize(qvec.size());
 
 			for (size_t iq = 0; iq < qvec.size(); iq++){
@@ -845,7 +886,7 @@ struct coulomb_model
 			Eq2_ppa[iq] = dtmp / qscr2_RPA[iq][0];
 			}
 			else if (clp.ppamodel == "gn"){
-			//Godby¨CNeeds
+			//Godbyï¿½CNeeds
 			complex ctmp = wp2 * qscr2_RPA[iq][1];
 			Aq_ppa[iq] = -ctmp * qscr2_RPA[iq][0];
 			Eq2_ppa[iq] = ctmp / (qscr2_RPA[iq][0] - qscr2_RPA[iq][1]);
@@ -866,7 +907,7 @@ struct coulomb_model
 					Eq2_ppa[iq] = wp2 * (1 + complex(q_length_square, 0) / qscr2_RPA[iq][0]);
 				}
 				else if (clp.ppamodel == "gn"){
-					//Godby¨CNeeds
+					//Godbyï¿½CNeeds
 					complex eps0inv = c1 / (1 + qscr2_RPA[iq][0] / q_length_square);
 					complex epspinv = c1 / (1 + qscr2_RPA[iq][1] / q_length_square);
 					Eq2_ppa[iq] = wp2 * (1 - epspinv) / (epspinv - eps0inv);
