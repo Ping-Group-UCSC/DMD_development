@@ -12,11 +12,12 @@ struct coulombParam{
 	string scrMode; // "none", "medium"
 	string scrFormula; // "debye", "lindhard", "heg" (homogeneous electron gas), "RPA"
 	string dynamic; // "static", "ppa", "real-axis" (real-energy axis with smearing)
-	string ppamodel; // "gn" (Godby¨CNeeds), "hl" (Hybertsen-Louie)
+	string ppamodel; // "gn" (Godby<A8>CNeeds), "hl" (Hybertsen-Louie)
 	bool update, ovlp, fderavitive_technique, dynamic_screening_ee_two_freqs; // if ovlp, there is (n,n') sum with overlap, otherwise, (n) sum
 	double eppa, meff; // user-defined plasmon-pole energy, if zero, plasma frequency
 	int nomega; double omegamax; // real-energy axis, not implemented
 	double nfreetot, eps, smearing;
+	bool two_dim_screening_model;
 
 	void check_params(){
 		if (scrMode != "none" && scrMode != "medium")
