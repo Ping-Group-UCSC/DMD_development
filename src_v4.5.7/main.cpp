@@ -24,7 +24,11 @@ int main(int argc, char **argv)
 	// read parameters
 	parameters* param = new parameters();
 	param->read_param();
-
+	if (ionode){
+		printf("HELLO THERE\n");
+		printf("TESTA DI PIGNA !!\n");
+		printf("SI VERGOGNI !!!\n");
+	}
 	init_model(param);
 	if (material_model == "none") dm_dynamics_jdftx(param);
 
@@ -39,7 +43,7 @@ void dm_dynamics_jdftx(parameters* param){
 	//lattice
 	lattice* latt = new lattice(param);
 	latt->printLattice();
-
+	std::cout << "OK1" << std::endl;
 	// electron
 	electron* elec = new electron(&mpk, &mpk_morek, latt, param);
 	mpk.distribute_var("dm_dynamics_driver", elec->nk);
@@ -50,29 +54,36 @@ void dm_dynamics_jdftx(parameters* param){
 	elec->compute_dm_Bpert_1st(param->Bpert, param->t0);
 	if (elec->B.length() > 1e-10 || alg.read_Bso) elec->set_H_BS(mpk.varstart, mpk.varend);
 	if (abs(elec->scale_Ez) > 1e-10) elec->set_H_Ez(mpk.varstart, mpk.varend);
+	std::cout << "OK2" << std::endl;
 	//if ((alg.picture == "schrodinger" || param->t0 == 0) && param->Bpert.length() > 1e-12) elec->compute_DP_related(param->Bpert); // Not needed for this moment. May add back later
 	// phonon
 	phonon* ph = new phonon(latt, param, elec); // may need elec->kmesh and elec->kvec to construct qvec
-
+	std::cout << "OK3" << std::endl;
 	// electron-light or laser
 	electronlight* elight;
 	if (pmp.active()){
 		elight = new electronlight(latt, param, elec, &mpk);
 		if (pmp.laserAlg == "perturb") elight->pump_pert();
 	}
-
+	std::cout << "OK4" << std::endl;
 	// electron-phonon
 	electronphonon* eph = new electronphonon(&mpkpair, latt, param, elec, ph, alg.eph_sepr_eh, !alg.eph_need_elec);
+	std::cout << "OK4A" << std::endl;
 	if (alg.scatt_enable) mpkpair.distribute_var("dm_dynamics_jdftx", eph->nkpair_glob);
+	std::cout << "OK4B" << std::endl;
 	if (alg.scatt_enable) eph->set_eph();
+	std::cout << "OK4C" << std::endl;
 	if (alg.scatt_enable && alg.linearize && param->need_imsig) eph->compute_imsig();
+	std::cout << "OK4D" << std::endl;
 	if (alg.scatt_enable) eph->analyse_g2(param->de_measure, param->degauss_measure, param->degthr);
 	if (alg.scatt_enable) eph->analyse_g2_ei(param->de_measure, param->degauss_measure, param->degthr);
-
+	std::cout << "OK5" << std::endl;
+	exit(1);
+	
 	MPI_Barrier(MPI_COMM_WORLD);
 	dm_dynamics<lattice, electron, electronlight, electronphonon>* dmdyn =
 		new dm_dynamics<lattice, electron, electronlight, electronphonon>(latt, param, elec, elight, eph);
-
+	
 	//==================================================
 	// evolve density matrix
 	//==================================================
