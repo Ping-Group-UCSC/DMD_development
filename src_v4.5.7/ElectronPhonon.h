@@ -79,9 +79,10 @@ public:
 		this->e = trunc_alloccopy_array(elec->e_dm, nk_glob, bStart, bEnd);
 
 		get_nkpair();
-
+		if (ionode) std::cout << "SEI UNA SCHIAPPA 1" << std::endl;
 		if (clp.scrMode != "none")
 			coul_model = new coulomb_model(latt, param, elec, bStart, bEnd, eEnd - eStart);
+		if (ionode) std::cout << "SEI UNA SCHIAPPA 2" << std::endl;
 		if (eip.ni.size() > 0) eimp = new electronimpurity*[eip.ni.size()]{nullptr};
 		for (int iD = 0; iD < eip.ni.size(); iD++){
 			eimp[iD] = new electronimpurity(iD, mp, isHole, nkpair_glob, nb, latt->cell_size);
