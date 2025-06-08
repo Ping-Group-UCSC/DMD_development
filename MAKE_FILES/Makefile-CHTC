@@ -36,6 +36,7 @@ directories:
 #Clean only Objecst
 clean:
 	@$(RM) -rf $(BUILDDIR)
+	@$(RM) a-*.d
 
 #Full Clean, Objects and Binaries
 cleaner: clean
