@@ -230,6 +230,9 @@ void parameters::read_param(){
 	eep.degauss = get(param_map, "degauss_ee", degauss / eV, eV);
 	freq_update_ee_model = get(param_map, "freq_update_ee_model", 0);
 
+	// phonons -> Ehrenfest dynamics
+	Ehrenfest_dyn = get(param_map, "Ehrenfest_dynamics", false);
+
 	if (ionode) printf("\n**************************************************\n");
 	if (ionode) printf("Spin generation and measurement parameters:\n");
 	if (ionode) printf("**************************************************\n");
