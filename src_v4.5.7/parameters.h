@@ -41,6 +41,8 @@ public:
 	std::vector<std::vector<bool>> vtrans;
 	string type_q_ana;
 
+	bool Ehrenfest_dyn;      // Ehrenfest dynamics - active
+
 	parameters(){}
 
 	void read_param();
