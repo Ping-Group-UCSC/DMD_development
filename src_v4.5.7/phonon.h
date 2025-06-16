@@ -2,6 +2,7 @@
 #include "common_headers.h"
 #include "lattice.h"
 #include "parameters.h"
+#include "electron.h"
 
 class phonon{
 public:
