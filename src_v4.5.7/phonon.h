@@ -7,7 +7,7 @@ class phonon{
 public:
 	lattice *latt;
 	double temperature, omega_max;
-	int nq, nm, modeStart, modeEnd;
+	int nm, modeStart, modeEnd;
 	qIndexMap *qmap;
 	std::vector<vector3<double>> qvec;
 	double qmin, qmax;
