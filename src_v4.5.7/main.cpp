@@ -54,8 +54,10 @@ void dm_dynamics_jdftx(parameters* param){
 	//if ((alg.picture == "schrodinger" || param->t0 == 0) && param->Bpert.length() > 1e-12) elec->compute_DP_related(param->Bpert); // Not needed for this moment. May add back later
 	// phonon
 	phonon* ph = new phonon(latt, param, elec); // may need elec->kmesh and elec->kvec to construct qvec
+	if (ionode) std::cout << "##########################################" << std::endl;
 	if (ionode) std::cout << "Ehrenfest dyn: " << param->Ehrenfest_dyn << std::endl;
-	if (param->Ehrenfest_dyn) ph_amplitudes* ph_ampl = new ph_amplitudes(latt, param);
+	if (ionode) std::cout << "##########################################" << std::endl;
+	if (param->Ehrenfest_dyn) ph_amplitudes* ph_ampl = new ph_amplitudes(param, ph);
 	exit(1);
 
 	// electron-light or laser
