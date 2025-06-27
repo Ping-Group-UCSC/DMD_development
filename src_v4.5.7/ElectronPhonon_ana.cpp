@@ -1,5 +1,6 @@
 #include "ElectronPhonon.h"
 
+//TEST
 void electronphonon::analyse_g2(double de, double degauss, double degthr){
 	int nfile_gm = last_file_index("ldbd_data/ldbd_gm.bin.", "") + 1,
 		nfile_wq = last_file_index("ldbd_data/ldbd_wq_kpair.bin.", "") + 1;

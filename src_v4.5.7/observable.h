@@ -145,11 +145,13 @@ void ob_1dmk<Tl, Te>::measure_brange(string what, bool diff, bool print_ene, dou
 	// open files
 	bool isHole = scarr.substr(1, 4) == "hole";
 	string fname;
-	FILE *fil, *filtot;
+	string fname_k;
+	FILE *fil, *filtot, *fil_k;
 	if (!diff) scarr = "_initial" + scarr;
 	int idir;
 	if (what == "fn"){
 		fname = what + scarr + ".out"; fil = fopen(fname.c_str(), "a");
+		fname_k = what + scarr + "_k.out"; fil_k = fopen(fname_k.c_str(), "a");
 		if (diff){
 			fname = what + scarr + "_tot.out";
 			if (!exists(fname)){
@@ -168,7 +170,11 @@ void ob_1dmk<Tl, Te>::measure_brange(string what, bool diff, bool print_ene, dou
 		else if (what == "sz" || what == "lz" || what == "jz") idir = 2;
 		if (!ddmdt && diff){
 			fname = what + scarr + "_ene.out";
-			if (in_obSet(obSet1, what)) fil = fopen(fname.c_str(), "a");
+			fname_k = what + scarr + "_kpt.out";
+			if (in_obSet(obSet1, what)){
+                fil = fopen(fname.c_str(), "a");
+                fil_k = fopen(fname_k.c_str(), "a");
+            }
 			fname = what + scarr + "_tot.out";
 			if (!exists(fname)){
 				filtot = fopen(fname.c_str(), "a");
@@ -201,7 +207,9 @@ void ob_1dmk<Tl, Te>::measure_brange(string what, bool diff, bool print_ene, dou
 	zeros(obk, nk_glob); zeros(tot_band, nb);
 	zeros(tot_valley, (int)this->latt->vpos.size()); zeros(tot_valley_band, (int)this->latt->vpos.size(), nb);
 	gauss->reset();
-
+    //std::vector<double> kob_res(nk_glob*nb); 
+    //kob_res = new double[nk_glob*nb]; 
+    //for(int i=0;i< nk_glob*nb; i++) kob_res[i] = 0.0; 
 	// compute observables
 	for (int ik_glob = 0; ik_glob < nk_glob; ik_glob++){
 		int iv = this->latt->whichvalley(this->elec->kvec[ik_glob]);
@@ -338,6 +346,7 @@ void ob_1dmk<Tl, Te>::measure_brange(string what, bool diff, bool print_ene, dou
 				double ene = e[ik_glob][i];
 				gauss->addEvent(ene, ob);
 				//gauss->addEvent2(ene, ob_amp);
+				//kob_res[(ik_glob*nb)+i] = ob;
 			}
 		}
 	}
@@ -415,6 +424,29 @@ void ob_1dmk<Tl, Te>::measure_brange(string what, bool diff, bool print_ene, dou
 	if (!ddmdt && print_ene) fprintf(fil, "**************************************************\n");
 	if (what == "fn" || what == "dos" || (!ddmdt &&  diff && in_obSet(obSet1, what))) fflush(fil); fflush(stdout);
 	if (what == "fn" || what == "dos" || (!ddmdt &&  diff && in_obSet(obSet1, what))) fclose(fil);
+
+	// kpoint-resolved quantities
+	if (!ddmdt && print_ene) fprintf(fil_k, "**************************************************\n");
+	if (!ddmdt && print_ene) fprintf(fil_k, "time = %10.3e, print k and ob(k)\n", t);
+	if (!ddmdt && print_ene) fprintf(fil_k, "--------------------------------------------------\n");
+	if (!ddmdt && print_ene && what != "dos"){
+    
+		fprintf(fil_k, "test\n");
+		//for (size_t ik = 0; ik < nk_glob; ik++){
+        //    for (size_t ib = 0; ib < nb; ib++){  
+		//	    fprintf(fil_k, "%14.7le", kob_res[(ik*nb) + ib]);
+        //    }
+		//	fprintf(fil_k, "\n");
+        //}
+    }
+	if (!ddmdt && print_ene && what != "dos"){
+		if (fabs(t) < 1e-30) fprintf(fil_k, "time and density:  0.00000000000000e+01 %21.14le\n", tot);
+		else fprintf(fil_k, "time and density:  %21.14le %21.14le\n", t, tot); // carrier density in fn_ene.out
+	}
+	if (!ddmdt && print_ene) fprintf(fil_k, "**************************************************\n");
+	if (what == "fn" || what == "dos" || (!ddmdt &&  diff && in_obSet(obSet1, what))) fflush(fil_k); fflush(stdout);
+	if (what == "fn" || what == "dos" || (!ddmdt &&  diff && in_obSet(obSet1, what))) fclose(fil_k);
+
 }
 /*
 template<class Tl, class Te>
