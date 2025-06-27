@@ -175,7 +175,7 @@ public:
 	void print_array_atk(double **a, int n, string s = "", double unit = 1);
 	void print_mat_atk(complex **m, int n, string s = "");
 
-	void compute_dm_Bpert_1st(vector3<> Bpert, double t0);
+	void compute_dm_Bpert_1st(vector3<> Bpert, double t0);//<! Compute initial state from B-perterbation dm_Bpert = f + B(gS + L)/2
 	//void compute_DP_related(vector3<> Bpert);
 	void deg_proj(complex *m, double *e, int n, double thr, complex *mdeg);
 	void compute_b2(double de, double degauss, double degthr);
