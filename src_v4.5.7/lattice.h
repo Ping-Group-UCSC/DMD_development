@@ -167,4 +167,23 @@ public:
 		}
 		return qlength;
 	}
+
+	void find_qmin_qmax(vector<vector3<double>> qvec, double &qmin, double &qmax, int &iq_min) {
+		int iq_start = 0;
+		for (int iq=0; iq < qvec.size(); iq++) {
+			double q_length = sqrt(GGT.metric_length_squared(wrap(qvec[iq])));
+			if (q_length < 1e-10) continue;    // skip the Gamma point
+			qmax = qmin = q_length;
+			iq_min = iq;
+			iq_start = iq + 1;
+			break;
+		}
+		for (int iq=iq_start; iq < qvec.size(); iq++) {
+			double q_length = sqrt(GGT.metric_length_squared(wrap(qvec[iq])));
+			if (q_length < 1e-10) continue;   // skip Gamma point
+			if (q_length < qmin) {qmin = q_length; iq_min = iq; }
+			if (q_length > qmax) qmax = q_length;
+		}
+	}
+
 };
