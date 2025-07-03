@@ -30,6 +30,7 @@ struct kIndexMap{
 	size_t k2ik(vector3<> k); // if you are sure q already exists in qIndexMap
 
 	vector3<int> ikvec3(vector3<> k);
+	void print_map(vector<vector3<double>> kvec, string fname);
 };
 
 struct qIndexMap{
@@ -57,4 +58,5 @@ struct qIndexMap{
 	size_t q2iq(vector3<> q); // if you are sure q already exists in qIndexMap
 
 	vector3<int> iqvec3(vector3<> q);
+	void print_map(vector<vector3<double>> qvec, string fname);
 };
