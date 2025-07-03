@@ -7,6 +7,9 @@
 #include "ElectronImpurity.h"
 #include "ElecImp_Model.h"
 #include "ElecElec_Model.h"
+#include "Electron_gas_Model.h"
+#include "base_Coulomb_Model.h"
+#include "Coulomb_Model.h"
 
 // e-ph here also contains e-i and e-e, so in future we need to reorganise the source codes related to the scattering
 
@@ -19,11 +22,12 @@ public:
 	lattice *latt;
 	electron *elec;
 	phonon *ph;
-	coulomb_model *coul_model;
 	electronimpurity **eimp;
 	elecelec_model *ee_model;
 	const double t0, tend, degauss;
 	const double prefac_gaussexp, prefac_sqrtgaussexp;
+	coulomb_model *coul_model;
+	coulomb_model_base *screen_model;
 
 	double prefac_gauss, prefac_sqrtgauss, prefac_eph, scale_scatt, scale_eph, scale_ei, scale_ee;
 	int nk_glob, nk_proc, ik0_glob, ik1_glob;
@@ -79,10 +83,23 @@ public:
 		this->e = trunc_alloccopy_array(elec->e_dm, nk_glob, bStart, bEnd);
 
 		get_nkpair();
-		if (ionode) std::cout << "SEI UNA SCHIAPPA 1" << std::endl;
-		if (clp.scrMode != "none")
-			coul_model = new coulomb_model(latt, param, elec, bStart, bEnd, eEnd - eStart);
-		if (ionode) std::cout << "SEI UNA SCHIAPPA 2" << std::endl;
+		
+		if (ionode) std::cout << "LATTICE DIMENSION : " << latt->dim <<std::endl;
+		
+		if (clp.scrMode != "none") {
+			// define object based on the condition
+			int DimValue = latt->dim;
+			if (DimValue == 2) {
+				screen_model = new coulomb_model_2D(latt, param, elec, bStart, bEnd, eEnd-eStart);
+			}
+			else if (DimValue == 3) {
+				screen_model = new coulomb_model_3D(latt, param, elec, bStart, bEnd, eEnd-eStart);
+			}
+		}
+		if (ionode) std::cout << "OK UP TO HERE" << std::endl;
+		if (ionode) screen_model->print();
+		exit(1);
+		coul_model = new coulomb_model(latt, param, elec, bStart, bEnd, eEnd - eStart);
 		if (eip.ni.size() > 0) eimp = new electronimpurity*[eip.ni.size()]{nullptr};
 		for (int iD = 0; iD < eip.ni.size(); iD++){
 			eimp[iD] = new electronimpurity(iD, mp, isHole, nkpair_glob, nb, latt->cell_size);
