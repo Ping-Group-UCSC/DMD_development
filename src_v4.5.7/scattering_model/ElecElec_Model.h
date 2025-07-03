@@ -4,7 +4,7 @@
 #include "lattice.h"
 #include "parameters.h"
 #include "electron.h"
-#include "Coulomb_Model.h"
+#include "Electron_gas_Model.h"
 #include "mymp.h"
 
 struct elecelec_model
