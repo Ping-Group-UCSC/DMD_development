@@ -1,4 +1,5 @@
 #include "kmap.h"
+#include <iostream>
 
 bool kIndexMap::findk(vector3<> k, size_t& ik){
 	const std::map<vector3<int>, size_t>::iterator iter = the_map.find(ikvec3(k));
@@ -22,6 +23,16 @@ vector3<int> kIndexMap::ikvec3(vector3<> k){
 	return v3;
 }
 
+void kIndexMap::print_map(vector<vector3<double>> kvec, string fname){
+	FILE *fpk = fopen(fname.c_str(), "w");
+	fprintf(fpk, "\nPrint kIndexMap:\n"); fflush(fpk);
+	for (size_t ik = 0; ik < kvec.size(); ik++) {
+		std::map<vector3<int>, size_t>::iterator iter = the_map.find(ikvec3(kvec[ik]));
+		fprintf(fpk, "ikvec3 = (%d,%d,%d) ik = %lu\n", iter->first[0], iter->first[1], iter->first[2], iter->second);
+	}
+	fclose(fpk);
+}
+
 size_t qIndexMap::q2iq(vector3<> q){ // if you are sure q already exists in qIndexMap
 	return the_map[iqvec3(q)];
 }
@@ -34,4 +45,14 @@ vector3<int> qIndexMap::iqvec3(vector3<> q){
 		if (v3[iDir] == kmesh[iDir]) v3[iDir] = 0;
 	}
 	return v3;
+}
+
+void qIndexMap::print_map(vector<vector3<double>> qvec, string fname){
+	FILE *fpq = fopen(fname.c_str(), "w");
+	fprintf(fpq, "\nPrint qIndexMap:\n"); fflush(fpq);
+	for (size_t iq=0; iq < qvec.size(); iq++) {
+		std::map<vector3<int>, size_t>::iterator iter = the_map.find(iqvec3(qvec[iq]));
+		fprintf(fpq, "iqvec3 = (%d,%d,%d) iq = %lu\n", iter->first[0], iter->first[1], iter->first[2], iter->second);  fflush(fpq);
+	}
+	fclose(fpq);
 }
