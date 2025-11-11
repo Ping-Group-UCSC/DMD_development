@@ -6,20 +6,21 @@
 #include "electron.h"
 #include "Electron_gas_Model.h"
 #include "mymp.h"
+#include "base_Coulomb_Model.h"
 
 struct elecimp_model
 {
 	int iD;
 	lattice *latt;
 	electron *elec;
-	coulomb_model *coul_model;
+	coulomb_model_base *coul_model;
 	int nk, bStart, bEnd, nb, nbpow4, bStart_wannier; // bStart and bEnd relative to bStart_dm
 	double nk_full, degauss, ethr, prefac_A, prefac_gauss, prefac_sqrtgauss, prefac_exp_ld, prefac_exp_cv, prefac_imsig;
 	double **imsig;
 	complex *Uih, *ovlp, *eimp, *P1imp, *P2imp, *A1, *A2, *A1pp, *A1pm, *A1mp, *A1mm, *A2pp, *A2pm, *A2mp, *A2mm;
 	double **e, eStart, eEnd, omegaL;
 
-	elecimp_model(int iD, lattice *latt, parameters *param, electron *elec, int bStart, int bEnd, double eStart, double eEnd, coulomb_model *coul_model)
+	elecimp_model(int iD, lattice *latt, parameters *param, electron *elec, int bStart, int bEnd, double eStart, double eEnd, coulomb_model_base *coul_model)
 		: iD(iD), latt(latt), elec(elec), nk(elec->nk), nk_full(elec->nk_full), 
 		bStart(bStart), bEnd(bEnd), nb(bEnd - bStart), nbpow4((int)std::pow(nb, 4)), bStart_wannier(bStart + elec->bStart_dm + elec->bskipped_wannier),
 		eStart(eStart), eEnd(eEnd),
