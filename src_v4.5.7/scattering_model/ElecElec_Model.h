@@ -6,12 +6,13 @@
 #include "electron.h"
 #include "Electron_gas_Model.h"
 #include "mymp.h"
+#include "base_Coulomb_Model.h"
 
 struct elecelec_model
 {
 	lattice *latt;
 	electron *elec;
-	coulomb_model *coul_model;
+	coulomb_model_base *coul_model;
 	int nk, bStart, bEnd, nb, nbpow4, bStart_wannier; // bStart and bEnd relative to bStart_dm
 	double nk_full, degauss, ethr, prefac_gauss, prefac_sqrtgauss, prefac_exp_ld, prefac_exp_cv, prefac_imsig;
 	double **imsig, *delta;
@@ -19,7 +20,7 @@ struct elecelec_model
 	double **e, **f, eStart, eEnd;
 	kIndexMap *kmap;
 
-	elecelec_model(lattice *latt, parameters *param, electron *elec, int bStart, int bEnd, double eStart, double eEnd, coulomb_model *coul_model)
+	elecelec_model(lattice *latt, parameters *param, electron *elec, int bStart, int bEnd, double eStart, double eEnd, coulomb_model_base *coul_model)
 		: latt(latt), elec(elec), nk(elec->nk), nk_full(elec->nk_full), 
 		bStart(bStart), bEnd(bEnd), nb(bEnd - bStart), nbpow4((int)std::pow(nb, 4)), bStart_wannier(bStart + elec->bStart_dm + elec->bskipped_wannier),
 		eStart(eStart), eEnd(eEnd),
@@ -79,6 +80,7 @@ struct elecelec_model
 
 		if (!multply_vq) return;
 		if (clp.dynamic == "static"){
+			if (ionode) std::cout << " COMPUTE VQ MODEL HERE -------" << std::endl;
 			complex vq = coul_model->vq(elec->kvec[ik] - elec->kvec[jk]);
 			axbyc(ovlp, nullptr, nb*nb, c0, vq);
 		}
