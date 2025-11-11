@@ -43,7 +43,6 @@ void dm_dynamics_jdftx(parameters* param){
 	//lattice
 	lattice* latt = new lattice(param);
 	latt->printLattice();
-	std::cout << "OK1" << std::endl;
 	// electron
 	electron* elec = new electron(&mpk, &mpk_morek, latt, param);
 	mpk.distribute_var("dm_dynamics_driver", elec->nk);
@@ -78,7 +77,6 @@ void dm_dynamics_jdftx(parameters* param){
 	if (alg.scatt_enable) eph->analyse_g2(param->de_measure, param->degauss_measure, param->degthr);
 	if (alg.scatt_enable) eph->analyse_g2_ei(param->de_measure, param->degauss_measure, param->degthr);
 	std::cout << "OK5" << std::endl;
-	exit(1);
 	
 	MPI_Barrier(MPI_COMM_WORLD);
 	dm_dynamics<lattice, electron, electronlight, electronphonon>* dmdyn =
