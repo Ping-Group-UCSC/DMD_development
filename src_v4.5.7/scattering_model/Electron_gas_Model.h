@@ -391,6 +391,7 @@ struct homogeneous_electron_gas
 	}
 };
 
+/*
 struct coulomb_model
 {
 	mymp *mp;
@@ -725,6 +726,7 @@ struct coulomb_model
 		std::cout << "LATTICE area: " << latt->area << std::endl;
 		std::cout << "LATTICE volume: " << latt->volume << std::endl;
 	}
+	
 	void calc_qscr2_static_RPA(){
 		qscr2_static_RPA.resize(qvec.size(), c0);
 		// vq = vq0 / (1 - vq0 * sum_k [(f_k - f_k-q) / (e_k - e_k-q - w - i0)] / nk_full)
@@ -756,7 +758,7 @@ struct coulomb_model
 			}
 		}
 		axbyc(qscr2_ref.data(), nullptr, qvec.size(), 0, complex(prefac_vq / nk_full, 0), c0); // y = ax + by + c
-		*/
+		
 		std::cout << " OK -- " << std::endl;
 		for (int iq = 0; iq < qvec.size(); iq++){
 			if (ionode) std::cout << "iq --------> " << iq << std::endl;
@@ -870,7 +872,7 @@ struct coulomb_model
 		}
 		if (clp.dynamic == "ppa"){
 			double wp2 = clp.eppa * clp.eppa;
-
+			*/
 			/*
 			//If we use qscr^2(w) = A / (w^2 - wq^2), we can include q=0 in Godby�CNeeds PPA
 			Aq_ppa.resize(qvec.size()); Eq2_ppa.resize(qvec.size());
@@ -894,7 +896,7 @@ struct coulomb_model
 			}
 			}
 			*/
-
+			/*
 			//eps^-1(w) = 1 + A / (w^2 - wq^2)
 			Aq_ppa.resize(qvec.size()); Eq2_ppa.resize(qvec.size());
 
@@ -1028,3 +1030,4 @@ struct coulomb_model
 		MPI_Barrier(MPI_COMM_WORLD);
 	}
 };
+*/
