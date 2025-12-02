@@ -22,7 +22,7 @@ struct coulombParam{
 	void check_params(){
 		if (scrMode != "none" && scrMode != "medium")
 			error_message("scrMode must be none or medium now","coulombParam");
-		if (scrFormula != "unscreened" && scrFormula != "debye" && scrFormula != "Bechstedt" && scrFormula != "heg" && scrFormula != "lindhard" && scrFormula != "RPA")
+		if (scrFormula != "unscreened" && scrFormula != "debye" && scrFormula != "Bechstedt" && scrFormula != "heg" && scrFormula != "lindhard" && scrFormula != "RPA" && scrFormula != "keldysh")
 			error_message("scrFormula must be unscreened, debye, Bechstedt, heg, lindhard or RPA now","coulombParam");
 		if (dynamic == "static" && dynamic_screening_ee_two_freqs)
 			error_message("only for dynamic screening, dynamic_screening_ee_two_freqs can be true", "coulombParam");
