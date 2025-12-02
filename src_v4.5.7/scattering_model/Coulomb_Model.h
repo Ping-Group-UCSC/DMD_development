@@ -14,9 +14,25 @@ public:
         
         init_model(clp.nfreetot);
 
-        // RPA initialization
+		// 2D cutoff
 
-        init_RPA ();
+        calc_2d_cutoff();
+
+		if (clp.scrFormula == "RPA") {
+
+        	// RPA initialization
+
+        	init_RPA ();
+		}
+		else if (clp.scrFormula == "keldysh") {
+
+			// keldysh initialization
+
+			init_keldysh();
+		}
+		else {
+			error_message ("ONLY static RPA screening implemented in the 2D case");
+		}
 
     }
 
@@ -25,25 +41,30 @@ public:
     void init_model(double n, FILE *fp = stdout) override {
         if (ionode) std::cout << "2D MODEL INITIALIZER" << std::endl;
         if (ionode) std::cout << "screening formula: " << clp.scrFormula << std::endl;
-        if (clp.scrFormula != "RPA") error_message ("ONLY RPA screening implemented in the 2D case");
+        if (clp.scrFormula != "RPA" && clp.scrFormula != "keldysh") error_message ("ONLY RPA and Keldysh screening implemented in the 2D case");
     }
+
+	void init_keldysh (double **ft = nullptr) {
+		if (ionode) std::cout << "keldysh calculation initialization" << std::endl;
+		if (clp.dynamic != "static") error_message ("ONLY static screening implemented in the 2D case");
+		if (ft != nullptr) trunc_copy_array(f, ft, nk, 0, nb);
+
+		std::cout << "KELDYSH MODEL TO BE IMPLEMENTED" << std::endl;
+		exit(0);
+
+	}
 
     void init_RPA (double **ft = nullptr) {
         if (ionode) std::cout << "RPA calculation initialization" << std::endl;
         if (ionode) std::cout << "dynamic calculation: " << clp.dynamic << std::endl;
-        if (clp.dynamic != "static") error_message ("ONLY static RPA screening implemented in the 2D case");
+        if (clp.dynamic != "static") error_message ("ONLY static screening implemented in the 2D case");
         if (ft != nullptr) trunc_copy_array(f, ft, nk, 0, nb);
 
-        // 2D cutoff
-
-        calc_2d_cutoff();
-
         // qscr2 static RPA
-
         calc_qscr2_static_RPA ();
-
-        calc_vq_RPA ();
         
+		calc_vq_RPA ();
+		
     }
 
     void calc_2d_cutoff () {
@@ -63,6 +84,19 @@ public:
             cutoff_prefac[iq] = 1.0 - exp(-Qplz) * cos(Qzlz);
         }
     }
+
+	double calc_2d_cutoff_ofqv (vector3<double> q) {
+		vector3<double> q_z {0.0, 0.0, q[2]};
+		vector3<double> q_plane{q[0], q[1], 0.0};
+		double lz = 0.5 * latt->R(2,2);
+		double Qz = sqrt(latt->GGT.metric_length_squared(wrap(q_z)));
+		if (Qz > 0) Qz = Qz * q_z[2] / fabs(q_z[2]);
+		double Qp = sqrt(latt->GGT.metric_length_squared(wrap(q_plane)));
+		double Qplz = Qp * lz;
+		double Qzlz = Qz * lz;
+		double cutoff = 1.0 - exp(-Qplz) * cos(Qzlz);
+		return cutoff;
+	}
 
     void calc_qscr2_static_RPA () {
         std::cout << mp->myrank << " -> kvec size: " << elec->kvec.size() << std::endl;
@@ -89,7 +123,7 @@ public:
                 }
             }
             mp->allreduce(qscr2_static_RPA[iq], MPI_SUM);
-            qscr2_static_RPA[iq] = complex(prefac_vq / nk_full, 0) * qscr2_static_RPA[iq];
+            qscr2_static_RPA[iq] = complex(prefac_vq / nk_full, 0) * cutoff_prefac[iq] * qscr2_static_RPA[iq];
         }
         if (ionode) print_qscr2_static_RPA();
         if (ionode) printf("\ncalc_qscr2_static_RPA done\n");
@@ -107,8 +141,7 @@ public:
             }
         }
         else {
-            std::cout << "2D COULOMB INTERACTION -> ONLY STATIC MODE IMPLEMENTED" << std::endl;
-            exit(1);
+            error_message ("2D COULOMB INTERACTION -> ONLY STATIC MODE IMPLEMENTED");
         }
     }
 
@@ -116,7 +149,8 @@ public:
 		double q_length_square = latt->GGT.metric_length_squared(wrap(q));
         if (q_length_square < 1e-20) return c0;  // skip Gamma
 		if (clp.scrFormula == "unscreened") {
-			return complex(prefac_vq / q_length_square, 0);
+			double cutoff = calc_2d_cutoff_ofqv (q);
+			return complex(prefac_vq / q_length_square, 0) * cutoff;
 		}
 		else if (clp.scrFormula == "RPA") {
 			size_t iq = qmap->q2iq(q);
