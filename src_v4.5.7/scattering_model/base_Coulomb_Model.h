@@ -48,12 +48,12 @@ public:
     {
         if (ionode) printf("\nInitialize screening formula %s\n", clp.scrFormula.c_str());
 		if (ionode) printf("bStart = %d bEnd = %d nv = %d\n", bStart, bEnd, nv);
-        if (latt->dim < 3 && clp.scrFormula != "RPA") error_message("ONLY RPA screening implemented for 2D systems");
+        if (latt->dim < 3 && clp.scrFormula != "RPA" && clp.scrFormula != "keldysh") error_message("ONLY RPA or keldysh screening implemented for 2D systems");
         prefac_vq = 4 * M_PI / clp.eps / latt->cell_size;
         prefac_vq_bare = 4 * M_PI / latt->cell_size;
         e = trunc_alloccopy_array(elec->e_dm, nk, bStart, bEnd);
 		f = trunc_alloccopy_array(elec->f_dm, nk, bStart, bEnd);
-        if (clp.scrFormula == "RPA" || clp.scrFormula == "lindhard"){
+        if (clp.scrFormula == "RPA" || clp.scrFormula == "lindhard" || clp.scrFormula == "keldysh"){
             Uih = new complex[nb*elec->nb_wannier]{c0};
             ovlp = new complex[nb*nb]{c0};
         }
