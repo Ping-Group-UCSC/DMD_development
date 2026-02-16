@@ -28,7 +28,7 @@ along with JDFTx.  If not, see <http://www.gnu.org/licenses/>.
 //! Random number generation
 namespace Random
 {
-	void seed(int i); //seed random number generator
+	void seed(int i); //!<seed random number generator
 	double uniform(double start=0.0, double end=1.0); //!< uniform random numbers between 0 and 1
 	int uniformInt(int end); //!< uniform integer in [0,end)
 	double normal(double mean=0.0, double sigma=1.0, double cap=0.0); //!< normal random numbers with mean, sigma and an optional cap if non-zero

@@ -22,7 +22,7 @@ along with JDFTx.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace Random
 {
-	std::mt19937_64 generator;
+	std::mt19937_64 generator; //!<generator variable
 	std::normal_distribution<double> normdist;
 	std::uniform_real_distribution<double> uniformDist;
 	

@@ -154,7 +154,7 @@ public:
 	double **e;
 	complex **dm, **dm1, **ddmdt_eph;
 
-	void compute_ddmdt_eq(double **f0_expand);
+	void compute_ddmdt_eq(double **f0_expand);//!< compute equilibrium \f$ \dot\rho_0 = \frac{d}{dt} \rho_0\f$
 	void evolve_driver(double t, complex **dm_expand, complex **dm1_expand, complex **ddmdt_expand, bool compute_eq = false);
 	void evolve(double t, complex **dm, complex **dm1, complex **ddmdt, bool compute_eq = false);
 
